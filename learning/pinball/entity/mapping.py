@@ -8,7 +8,7 @@ class Mapper:
 
     def perform(self, pos):
         idxy = (pos - self.low) // self.span
-        assert (idxy <= k).all()
+        assert (idxy <= self.k).all()
         return int(idxy[0] * self.k + idxy[1])
 
 

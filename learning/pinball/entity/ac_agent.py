@@ -10,7 +10,8 @@ from .fourier import FourierBasis
 from .policy import SoftmaxPolicy
 from .reward_shaping import SubgoalPotentialRewardShaping,\
                             SubgoalSarsaRewardShaping,\
-                            NaiveRewardShaping
+                            NaiveRewardShaping, \
+                            SarsaRewardShaping
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,23 @@ class ActorCriticAgent(object):
         if model['theta'].shape != self.actor.theta.shape:
             return False
         return True
+
+
+class SarsaRSACAgent(ActorCriticAgent):
+    def __init__(self, seed, action_space, observation_space, mapper, basis_order=3,
+                 epsilon=0.01, gamma=0.99, gamma_v=0.99, lr_theta=0.01,
+                 lr_q=0.01, lr_v=0.01):
+        super().__init__(seed, action_space, observation_space, basis_order, epsilon, gamma, lr_theta, lr_q)   
+        self.reward_shaping = SarsaRewardShaping(gamma, gamma, lr_theta, mapper)
+        self.l_subepisodes = 0
+        self.pre_l_subepisodes = 0
+    
+    def update(self, pre_obs, pre_a, r, obs, a, done):
+        f = self.reward_shaping.value(pre_obs, pre_a, r, obs, done)
+        if done:
+            self.reward_shaping.reset()
+        super().update(pre_obs, pre_a, r+f, obs, a, done)
+        return r+f
 
 
 class SubgoalACAgent(ActorCriticAgent):

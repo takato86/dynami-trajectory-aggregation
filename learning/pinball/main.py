@@ -10,7 +10,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import itertools
 
-from entity.ac_agent import SubgoalACAgent, ActorCriticAgent, NaiveSubgoalACAgent
+from entity.ac_agent import SubgoalACAgent, \
+                            ActorCriticAgent, \
+                            NaiveSubgoalACAgent, \
+                            SarsaRSACAgent
+from entity.mapping import Mapper
 import gym_pinball
 from tqdm import tqdm, trange
 from visualizer import Visualizer
@@ -67,6 +71,11 @@ def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, s
     elif "naive" in exe_id:
         logger.info("Naive Subgoal AC Agent")
         agent = NaiveSubgoalACAgent(run, env.action_space, env.observation_space, rho=rho, eta=eta, subgoals=subgoals)
+    elif "sarsa-rs" == exe_id:
+        logger.info("Sarsa RS AC Agent")
+        mapper = Mapper(env.observation_space.low, env.observation_space.high, k=3)
+        agent = SarsaRSACAgent(run, env.action_space, env.observation_space, mapper)
+
     vis = Visualizer(["ACC_X", "ACC_Y", "DEC_X", "DEC_Y", "NONE"])
     if model:
         agent.load_model(model)
@@ -140,13 +149,19 @@ def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, s
 
 
 def main():
+    ALG_CHOICES = [
+        "subgoal",
+        "naive",
+        "actor-critic",
+        "sarsa-rs"
+    ]
     parser = argparse.ArgumentParser(description='Actor-Critic Learning.')
     parser.add_argument('env_id', nargs='?', default='Pinball-Subgoal-v0', help='Select the environment to run.')
     parser.add_argument('--vis', action='store_true', help='Attach when you want to look visual results.')
     parser.add_argument('--model', help='Input model dir path')
     parser.add_argument('--nepisodes', default=250, type=int)
     parser.add_argument('--nruns', default=25, type=int)
-    parser.add_argument('--id', default='', type=str)
+    parser.add_argument('--id', choices=ALG_CHOICES)
     parser.add_argument('--subg-path', default='', type=str)
     parser.add_argument('--eta', default=10000, type=int)
     parser.add_argument('--rho', default=0.01, type=int)

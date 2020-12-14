@@ -61,6 +61,49 @@ class NaiveRewardShaping:
         return 0
 
 
+class SarsaRewardShaping:
+    def __init__(self, gamma, gamma_v, lr_v, mapper):
+        self.gamma = gamma
+        self.gamma_v = gamma_v
+        self.lr_v = lr_v
+        self.cur_index = 0
+        self.mapper = mapper
+        self.critic = DiscreteCritic(mapper.k**2, gamma_v, lr_v)
+        self.l_subepisodes = 0
+        self.internal_reward = 0
+
+    def reset(self):
+        self.internal_reward = 0
+        self.l_subepisodes = 0
+
+    def value(self, pre_obs, pre_a, reward, obs, done):
+        pre_z = self.mapper.perform(pre_obs)
+        z = self.mapper.perform(obs)
+        h_reward = self.get_high_level_reward(reward, pre_obs, obs, done)
+        if h_reward != 0 or pre_z != z:
+            self.critic.update(pre_z, reward, h_reward, z, done, self.l_subepisodes)
+            self.l_subepisodes = 0
+        prev_potential = self.critic.value(pre_z)
+        potential = self.critic.value(z)
+        return self.gamma * potential - prev_potential
+
+    def get_high_level_reward(self, reward, pre_obs, obs, done):
+        # サブゴールに達成するまでは加算し続ける。サブゴールに到達した時点でフィードバックを累計報酬として返す。
+        # return reward
+        # if reward < 0:
+        #     reward = 0
+        self.internal_reward += self.gamma**self.l_subepisodes * reward
+        self.l_subepisodes += 1
+        # self.internal_reward += reward
+        if done or self.mapper.perform(pre_obs) != self.mapper.perform(obs):
+            # ゴールに到達した場合
+            r = self.internal_reward
+            self.internal_reward = 0
+            return r
+        else:
+            return 0
+
+
 class SubgoalSarsaRewardShaping:
     def __init__(self, subg_serieses, gamma, gamma_v, lr_v, fourier_basis):
         self.subg_serieses = [[{'pos_x':0.2, 'pos_y': 0.9, 'rad': 0}]] + subg_serieses
@@ -192,6 +235,23 @@ class SubgoalSarsaRewardShaping:
             return r
         else:
             return 0
+
+
+class DiscreteCritic:
+    def __init__(self, n_states, gamma, lr):
+        self.v = np.zeros(n_states)
+        self.gamma = gamma 
+        self.lr = lr
+    
+    def update(self, pre_state, reward, h_reward, state, done, t):
+        update_target = h_reward
+        if not done:
+            update_target += self.gamma**t * self.value(state)
+        td_error = update_target - self.value(pre_state)
+        self.v[pre_state] += self.lr * td_error
+
+    def value(self, state):
+        return self.v[state]
 
 
 class SubgoalCritic:
