@@ -167,3 +167,49 @@ class SubgoalSarsaRewardShaping(SubgoalReward):
             return self.discount_v ** time * reward
         else:
             return 0
+
+
+# Online learning of shaping rewards in reinforcement learning
+# Grzes M, Kudenko D
+# 10.1016/j.neunet.2010.01.001
+class SarsaRewardShaping(PotentialBasedShapingReward):
+    def __init__(self, discount, nfeatures, discount_v, lr_v, aggr_set):
+        super().__init__(discount, nfeatures)
+        self.discount_v = discount_v
+        self.lr_v = lr_v
+        self.subgoal_values = [0 for _ in range(len(aggr_set))]
+        # self.subgoal_values += [[0 for s in subgoal_series] for subgoal_series in subgoal_serieses]
+        self.to_z = self.trans(aggr_set)
+        self.curr_z = 0
+        self.pre_z = 0
+        self.time = 0
+    
+    def trans(self, aggr_set):
+        aggregation_dict = {}
+        for i, aggr_states in enumerate(aggr_set):
+            for state in aggr_states:
+                aggregation_dict[state] = i
+        return aggregation_dict
+        
+    def value(self, state, done):
+        potential = self.subgoal_values[self.curr_z]
+        pre_potential = self.subgoal_values[self.pre_z]
+        shaping_reward = self.discount * potential - pre_potential
+        if done:
+            self.curr_z = 0
+            self.time = 0
+        if shaping_reward != 0:
+            logger.debug(f"additional reward: {shaping_reward}")
+            logger.debug(f"potential value: {potential}")
+        return shaping_reward
+
+    def fit(self, state, reward, done):
+        self.time += 1
+        self.pre_z = self.curr_z
+        self.curr_z = self.to_z[state]
+        logger.debug(f"previous: {self.pre_z}, current: {self.curr_z}")
+        if self.pre_z != self.curr_z or reward != 0:
+            self.subgoal_values[self.pre_z] \
+                = (1 - self.lr_v) * self.subgoal_values[self.pre_z]\
+                  + self.lr_v * (reward + self.discount_v ** self.time * self.subgoal_values[self.curr_z])
+            self.time = 0

@@ -22,6 +22,19 @@ from visualizer import Visualizer
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+OUTPUT_TYPES = [
+    'total_reward',
+    'td_error',
+    'steps', 'runtime'
+]
+ALG_CHOICES = [
+    "subgoal",
+    "naive",
+    "actor-critic",
+    "sarsa-rs"
+]
+
+
 def export_csv(file_path, file_name, array):
     if not os.path.exists(file_path):
         os.makedirs(file_path)
@@ -55,26 +68,47 @@ def load_subgoals(file_path):
     return subg_serieses
 
 
-def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, subgoals, l_id):
+def get_file_names(exe_id, l_id, run, eta=None, rho=None, k=None):
+    fnames = {}
+    for _type in OUTPUT_TYPES:
+        fname = f"{exe_id}_{_type}_{l_id}_{run}"
+        if eta is not None:
+            fname += "_eta={}".format(eta)
+        if rho is not None:
+            fname += "_rho={}".format(rho)
+        if k is not None:
+            fname += "_k={}".format(k)
+        fname += ".csv"
+        fnames[_type] = fname
+    return fnames
+
+
+def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, subgoals, l_id, k):
     logger.info(f"start run {run}")
     subg_confs = list(itertools.chain.from_iterable(subgoals))
     env = gym.make(env_id, subg_confs=subg_confs)
     outdir = '/tmp/random-agent-results'
     env = wrappers.Monitor(env, directory=outdir, force=True)
     env.seed(0)
-    if "subgoal" in exe_id:
+    if "subgoal" == exe_id:
         logger.info("Subgoal AC Agent")
         agent = SubgoalACAgent(run, env.action_space, env.observation_space, rho=rho, eta=eta, subgoals=subgoals)
-    elif "actor-critic" in exe_id:
+        fnames = get_file_names(exe_id, l_id, run)
+    elif "actor-critic" == exe_id:
         logger.info("Actor-Critic Agent")
         agent = ActorCriticAgent(run, env.action_space, env.observation_space)
-    elif "naive" in exe_id:
+        fnames = get_file_names(exe_id, l_id, run)
+    elif "naive" == exe_id:
         logger.info("Naive Subgoal AC Agent")
         agent = NaiveSubgoalACAgent(run, env.action_space, env.observation_space, rho=rho, eta=eta, subgoals=subgoals)
+        fnames = get_file_names(exe_id, l_id, run, eta, rho)
     elif "sarsa-rs" == exe_id:
         logger.info("Sarsa RS AC Agent")
-        mapper = Mapper(env.observation_space.low, env.observation_space.high, k=3)
+        mapper = Mapper(env.observation_space.low, env.observation_space.high, k=k)
         agent = SarsaRSACAgent(run, env.action_space, env.observation_space, mapper)
+        fnames = get_file_names(exe_id, l_id, run, k=k)
+    else:
+        raise NotImplemented
 
     vis = Visualizer(["ACC_X", "ACC_Y", "DEC_X", "DEC_Y", "NONE"])
     if model:
@@ -131,16 +165,16 @@ def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, s
     # export process
     runtimes.append(time.time() - start_time)
     saved_res_dir = os.path.join(saved_dir, 'res')
-    export_csv(saved_res_dir, f"{exe_id}_total_reward_{l_id}_{run}_eta={eta}_rho={rho}.csv", total_reward_list)
+    export_csv(saved_res_dir, fnames['total_reward'], total_reward_list)
     td_error_list = agent.td_error_list
-    export_csv(saved_res_dir, f"{exe_id}_td_error_{l_id}_{run}_eta={eta}_rho={rho}.csv", td_error_list)
+    export_csv(saved_res_dir, fnames['td_error'], td_error_list)
     total_reward_list = np.array(total_reward_list)
     steps_list = np.array(steps_list)
     max_q_list = np.array(max_q_list)
     logger.debug("Average return: {}".format(np.average(total_reward_list)))
-    steps_file_path = os.path.join(saved_res_dir, f"{exe_id}_steps_{l_id}_{run}_eta={eta}_rho={rho}.csv")
+    steps_file_path = os.path.join(saved_res_dir, fnames['steps'])
     pd.DataFrame(steps_list).to_csv(steps_file_path)
-    runtime_file_path = os.path.join(saved_res_dir, f"{exe_id}_runtime_{l_id}_{run}_eta={eta}_rho={rho}.csv")
+    runtime_file_path = os.path.join(saved_res_dir, fnames['runtime'])
     runtimes_df = pd.DataFrame(runtimes, columns=["runtime"]).to_csv(runtime_file_path)
     # save model
     # saved_model_dir = os.path.join(saved_dir, 'model')
@@ -149,12 +183,6 @@ def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, s
 
 
 def main():
-    ALG_CHOICES = [
-        "subgoal",
-        "naive",
-        "actor-critic",
-        "sarsa-rs"
-    ]
     parser = argparse.ArgumentParser(description='Actor-Critic Learning.')
     parser.add_argument('env_id', nargs='?', default='Pinball-Subgoal-v0', help='Select the environment to run.')
     parser.add_argument('--vis', action='store_true', help='Attach when you want to look visual results.')
@@ -165,6 +193,7 @@ def main():
     parser.add_argument('--subg-path', default='', type=str)
     parser.add_argument('--eta', default=10000, type=int)
     parser.add_argument('--rho', default=0.01, type=int)
+    parser.add_argument('--k', type=int, required=True, help='How many to discretize the observation related to space.')
     
     args = parser.parse_args()
     learning_time = time.time()
@@ -180,7 +209,7 @@ def main():
         for run in range(args.nruns):
             logger.info(f"Run: {run+1}/{args.nruns}")
             learning_loop(run, args.env_id, args.nepisodes, args.model,
-                            args.vis, args.id, args.rho, args.eta, subg_series, l_id)
+                            args.vis, args.id, args.rho, args.eta, subg_series, l_id, args.k)
             # Close the env and write monitor result info to disk
     duration = time.time() - learning_time
     logger.info("Learning time: {}m {}s".format(int(duration//60), int(duration%60)))

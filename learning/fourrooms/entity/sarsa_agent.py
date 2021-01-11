@@ -4,7 +4,8 @@ import logging
 from .policy import SoftmaxPolicy, EgreedyPolicy
 from .tabular import Tabular
 from .reward_shaping import NaiveSubgoalRewardShaping,\
-                            SubgoalSarsaRewardShaping
+                            SubgoalSarsaRewardShaping,\
+                            SarsaRewardShaping
 
 import csv
 
@@ -108,3 +109,25 @@ class Sarsa:
         tderror = update_target - self.value(phi, action)
         self.weights[phi, action] += self.lr * tderror
         return update_target
+
+
+class SarsaRSSarsaAgent(SarsaAgent):
+    def __init__(self, discount, epsilon, lr, nfeatures, nactions, temperature, rng, aggr_set):
+        logger.debug("SarsaRSSarsaAgent is going to perform!")
+        super().__init__(discount, epsilon, lr, nfeatures, nactions, temperature, rng)
+        self.aggr_set = aggr_set
+        self.reward_shaping = SarsaRewardShaping(discount, nfeatures, discount, lr, aggr_set)
+        
+    def update(self, state, action, next_state, reward, done):
+        phi = self.features(state)
+        next_phi = self.features(next_state)
+        self.reward_shaping.fit(next_state, reward, done)
+        reward += self.reward_shaping.value(next_state, done)
+        next_action = self.act(next_state)
+        self.total_shaped_reward += reward
+        _ = self.critic.update(phi, action, next_phi, reward, done, next_action)
+
+    def reset(self):
+        rng = np.random.RandomState(np.random.randint(0, 100))
+        self.__init__(self.discount, self.epsilon, self.lr, self.nfeatures, self.nactions,
+                      self.temperature, rng, self.aggr_set)

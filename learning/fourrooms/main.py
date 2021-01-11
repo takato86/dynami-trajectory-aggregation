@@ -10,12 +10,20 @@ import configparser
 from tqdm import tqdm, trange
 from entity.sg_parser import parser
 import matplotlib.pyplot as plt
-from entity.sarsa_agent import SubgoalRSSarsaAgent, SarsaAgent, NaiveSubgoalSarsaAgent
+from entity.sarsa_agent import SubgoalRSSarsaAgent, SarsaAgent, NaiveSubgoalSarsaAgent,\
+                               SarsaRSSarsaAgent
 
 '''
 avg_duration: 1つのOptionが続けられる平均ステップ数
 step        : 1エピソードに要したステップ数
 '''
+
+ALG_CHOICES = [
+    "subgoal",
+    "naive",
+    "actor-critic",
+    "sarsa-rs"
+]
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -98,6 +106,7 @@ def learning_loop(env, agent, nruns, nepisodes, nsteps,
 
 
 def main():
+    logger.info("env: {}, alg: {}".format(args.env_id, args.id))
     env_to_wrap = gym.make(args.env_id)
     # env_to_wrap.env.init_states = [0]
     if args.video:
@@ -128,9 +137,42 @@ def main():
             agent = SubgoalRSSarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions,
                                     args.temperature, rng, subgoal, args.eta, args.rho, subgoal_values=None)
         elif "sarsa" == args.id:
-            logger.info("SarsaAgent")
+            logger.debug("SarsaAgent")
             agent = SarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions, args.temperature, rng)
-        
+        elif "sarsa-rs" == args.id:
+            logger.debug("SarsaRSAgent")
+            upper_left = [
+                0, 1, 2, 3, 4, 
+                10, 11, 12, 13, 14,
+                20, 21, 22, 23, 24, 25,
+                31, 32, 33, 34, 35,
+                41, 42, 43, 44, 45, 51
+            ]
+            upper_right = [
+                5, 6, 7 ,8, 9,
+                15, 16, 17, 18, 19,
+                26, 27, 28, 29, 30,
+                36, 37, 38, 39, 40,
+                46, 47, 48, 49, 50,
+                52, 53, 54, 55, 56, 62
+            ]
+            lower_left = [
+                57, 58, 59, 60, 61,
+                63, 64, 65, 66, 67,
+                73, 74, 75, 76, 77,
+                83, 84, 85, 86, 87, 88,
+                94, 95, 96, 97, 98
+            ]
+            lower_right = [
+                68, 69, 70, 71, 72,
+                78, 79, 80, 81, 82,
+                89, 90, 91, 92, 93,
+                99, 100, 101, 102, 103
+            ]
+            aggr_set = [upper_left, upper_right, lower_left, lower_right]
+            agent = SarsaRSSarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions,
+                                      args.temperature, rng, aggr_set)
+
         learning_loop(env, agent, args.nruns, args.nepisodes, args.nsteps,
                       args.id, args.env_id, learn_id)
     env.close()
@@ -139,38 +181,9 @@ def main():
 if __name__ == '__main__':
     parser.add_argument('--ac', action='store_true')
     parser.add_argument('--video', action='store_true')
-    parser.add_argument('--id', default='no_name', type=str)
+    parser.add_argument('--id', default='no_name', choices=ALG_CHOICES, type=str)
     parser.add_argument('--rho', default=0.05, type=float)
     args = parser.parse_args()
-
-    upper_left = [
-                    0, 1, 2, 3, 4, 
-                    10, 11, 12, 13, 14,
-                    20, 21, 22, 23, 24, 25,
-                    31, 32, 33, 34, 35,
-                    41, 42, 43, 44, 45, 51
-    ]  
-    upper_right = [
-                    5, 6, 7 ,8, 9,
-                    15, 16, 17, 18, 19,
-                    26, 27, 28, 29, 30,
-                    36, 37, 38, 39, 40,
-                    46, 47, 48, 49, 50,
-                    52, 53, 54, 55, 56, 62
-    ]
-    lower_left = [
-                    57, 58, 59, 60, 61,
-                    63, 64, 65, 66, 67,
-                    73, 74, 75, 76, 77,
-                    83, 84, 85, 86, 87, 88,
-                    94, 95, 96, 97, 98
-    ]
-    lower_right = [
-                    68, 69, 70, 71, 72,
-                    78, 79, 80, 81, 82,
-                    89, 90, 91, 92, 93,
-                    99, 100, 101, 102, 103
-    ]
     env_dir = prep_dir(os.path.join("res", "env"))
     val_dir = prep_dir(os.path.join("res", "values"))
     episode_dir = prep_dir(os.path.join("res", "episode"))
