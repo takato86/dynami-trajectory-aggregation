@@ -12,8 +12,10 @@ from .reward_shaping import SubgoalPotentialRewardShaping,\
                             SubgoalSarsaRewardShaping,\
                             NaiveRewardShaping, \
                             SarsaRewardShaping
+from shaner import SarsaRS
 
 logger = logging.getLogger(__name__)
+
 
 class Actor(object):
     def __init__(self, rng, n_actions, n_features, lr_theta, temperature=1.0):
@@ -23,7 +25,7 @@ class Actor(object):
         self.theta = np.zeros((n_actions, self.n_features))
         self.lr_theta = lr_theta
         self.temperature = temperature
-        
+
     def update(self, feat, action, q_value):
         lr = self.lr_theta/np.linalg.norm(feat)
         self.theta += lr * q_value * self.grad(feat, action)
@@ -38,13 +40,13 @@ class Actor(object):
         # TODO check
         energy = self.value(feat) # / self.temperature # >> (1, #actions)
         return np.exp(energy - logsumexp(energy))
-    
+
     def value(self, feat, action=None):
         energy = np.dot(self.theta, feat)
         if action is None:
             return energy
         return energy[action]
-    
+
     def grad(self, feat, action):
         action_dist = self.pmf(feat)
         action_dist = action_dist.reshape(1, len(action_dist))
@@ -122,7 +124,7 @@ class ActorCriticAgent(object):
         # q_u_list -= q_omega
         self.max_error = abs(error) if abs(error) > self.max_error else self.max_error
         return 0
-    
+
     def get_max_q(self, obs):
         feat = self.fourier_basis(obs)
         q_value = self.critic.value(feat)
@@ -132,13 +134,13 @@ class ActorCriticAgent(object):
         ret_error = self.max_error
         self.max_error = 0
         return ret_error
-    
+
     def save_model(self, dir_path, episode_count):
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
         file_path = os.path.join(dir_path, f'ac_model_{episode_count}.npz')
         np.savez(file_path, w_q=self.critic.w_q, theta=self.actor.theta)
-        
+
     def load_model(self, file_path):
         oc_model = np.load(file_path)
         if self._check_model(oc_model):
@@ -146,7 +148,7 @@ class ActorCriticAgent(object):
             self.actor.theta = oc_model['theta']
         else:
             raise Exception('Not suitable model data.')
-        
+
     def _check_model(self, model):
         if model['w_q'].shape != self.critic.w_q.shape:
             return False
@@ -156,16 +158,19 @@ class ActorCriticAgent(object):
 
 
 class SarsaRSACAgent(ActorCriticAgent):
-    def __init__(self, seed, action_space, observation_space, mapper, basis_order=3,
+    def __init__(self, seed, action_space, observation_space, env, params, basis_order=3,
                  epsilon=0.01, gamma=0.99, gamma_v=0.99, lr_theta=0.01,
                  lr_q=0.01, lr_v=0.01):
-        super().__init__(seed, action_space, observation_space, basis_order, epsilon, gamma, lr_theta, lr_q)   
-        self.reward_shaping = SarsaRewardShaping(gamma, gamma, lr_theta, mapper)
+        super().__init__(
+            seed, action_space, observation_space, basis_order, epsilon, gamma,
+            lr_theta, lr_q
+        )
+        self.reward_shaping = SarsaRS(gamma, lr_theta, env, params)
         self.l_subepisodes = 0
         self.pre_l_subepisodes = 0
-    
+
     def update(self, pre_obs, pre_a, r, obs, a, done):
-        f = self.reward_shaping.value(pre_obs, pre_a, r, obs, done)
+        f = self.reward_shaping.perform(pre_obs, obs, r, done)
         if done:
             self.reward_shaping.reset()
         super().update(pre_obs, pre_a, r+f, obs, a, done)
@@ -184,7 +189,7 @@ class SubgoalACAgent(ActorCriticAgent):
         self.reward_shaping = SubgoalSarsaRewardShaping(subgoals, gamma, gamma_v, lr_q, self.fourier_basis)    
         self.l_subepisodes = 0
         self.pre_l_subepisodes = 0
-    
+
     def update(self, pre_obs, pre_a, r, obs, a, done):
         # self.pre_l_subepisodes = self.l_subepisodes
         # self.l_subepisodes += 1
@@ -209,7 +214,6 @@ class NaiveSubgoalACAgent(SubgoalACAgent):
                  epsilon=0.01, gamma=0.99, gamma_v=0.99, lr_theta=0.01,
                  lr_q=0.01, lr_v=0.01, eta=500, rho=1e-08, subgoals={1:[]}):
         super().__init__(seed, action_space, observation_space, basis_order,
-                 epsilon, gamma, gamma_v, lr_theta, lr_q, lr_v, eta, rho, subgoals)
+                         epsilon, gamma, gamma_v, lr_theta, lr_q, lr_v, eta,
+                         rho, subgoals)
         self.reward_shaping = NaiveRewardShaping(subgoals, gamma, eta)
-
-    

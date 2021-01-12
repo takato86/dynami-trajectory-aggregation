@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Mapper:
     def __init__(self, low, high, k):
         self.low = low

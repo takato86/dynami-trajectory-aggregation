@@ -104,8 +104,17 @@ def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, s
         fnames = get_file_names(exe_id, l_id, run, eta, rho)
     elif "sarsa-rs" == exe_id:
         logger.info("Sarsa RS AC Agent")
-        mapper = Mapper(env.observation_space.low, env.observation_space.high, k=k)
-        agent = SarsaRSACAgent(run, env.action_space, env.observation_space, mapper)
+        params = {
+            "vid": "table",
+            "aggr_id": "disc",
+            "params": {
+                "env": env,
+                "n": k
+            }
+        }
+        agent = SarsaRSACAgent(
+            run, env.action_space, env.observation_space, env, params
+        )
         fnames = get_file_names(exe_id, l_id, run, k=k)
     else:
         raise NotImplemented
