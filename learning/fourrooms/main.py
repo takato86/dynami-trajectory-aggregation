@@ -5,6 +5,7 @@ import pandas as pd
 import gym_fourrooms
 import logging
 import os
+import json
 import time
 import configparser
 from tqdm import tqdm, trange
@@ -21,7 +22,7 @@ step        : 1エピソードに要したステップ数
 ALG_CHOICES = [
     "subgoal",
     "naive",
-    "actor-critic",
+    "sarsa",
     "sarsa-rs"
 ]
 
@@ -31,11 +32,11 @@ inifile = configparser.ConfigParser()
 inifile.read("../../config.ini")
 
 
-def export_env(file_path, env):
-    to_state = np.full(env.occupancy.shape, -1)
-    for k, val in env.tostate.items():
-        to_state[k[0]][k[1]] = val
-    pd.DataFrame(to_state).to_csv(file_path)
+# def export_env(file_path, env):
+#     to_state = np.full(env.occupancy.shape, -1)
+#     for k, val in env.tostate.items():
+#         to_state[k[0]][k[1]] = val
+#     pd.DataFrame(to_state).to_csv(file_path)
 
 
 def export_steps(file_path, steps):
@@ -116,23 +117,27 @@ def main():
     else:
         env = env_to_wrap
 
-    export_env(os.path.join(env_dir, f"{args.env_id}.csv"), env_to_wrap)
+    # export_env(os.path.join(env_dir, f"{args.env_id}.csv"), env_to_wrap)
     nfeatures, nactions = env.observation_space.n, env.action_space.n
     subgoals = [[]]
-    if "subgoal" in args.id:
+    if "subgoal" == args.id or "naive" == args.id:
         subgoals = load_subgoals(args.subgoal_path, task_id=1)
         logger.info(f"subgoals: {subgoals}")
+    elif "sarsa-rs" == args.id:
+        json_open = open(args.mapping_path)
+        aggr_set = [l for _, l in json.load(json_open).items()]
+        logger.info(f"mappings: {aggr_set}")
 
     logger.info(f"Start learning in the case of eta={args.eta}, rho={args.rho}")
 
     for learn_id, subgoal in enumerate(subgoals):
         logger.info(f"Subgoal {learn_id+1}/{len(subgoals)}: {subgoal}")
         rng = np.random.RandomState(learn_id)
-        if "naive" in args.id and "subgoal" in args.id:
+        if "naive" == args.id:
             logger.info("NaiveSubgoalSarsaAgent")
             agent = NaiveSubgoalSarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions,
                                     args.temperature, rng, subgoal, args.eta, args.rho, subgoal_values=None)
-        elif "subgoal" in args.id:
+        elif "subgoal" == args.id:
             logger.info("SubgoalRSSarsaAgent")
             agent = SubgoalRSSarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions,
                                     args.temperature, rng, subgoal, args.eta, args.rho, subgoal_values=None)
@@ -141,35 +146,6 @@ def main():
             agent = SarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions, args.temperature, rng)
         elif "sarsa-rs" == args.id:
             logger.debug("SarsaRSAgent")
-            upper_left = [
-                0, 1, 2, 3, 4, 
-                10, 11, 12, 13, 14,
-                20, 21, 22, 23, 24, 25,
-                31, 32, 33, 34, 35,
-                41, 42, 43, 44, 45, 51
-            ]
-            upper_right = [
-                5, 6, 7 ,8, 9,
-                15, 16, 17, 18, 19,
-                26, 27, 28, 29, 30,
-                36, 37, 38, 39, 40,
-                46, 47, 48, 49, 50,
-                52, 53, 54, 55, 56, 62
-            ]
-            lower_left = [
-                57, 58, 59, 60, 61,
-                63, 64, 65, 66, 67,
-                73, 74, 75, 76, 77,
-                83, 84, 85, 86, 87, 88,
-                94, 95, 96, 97, 98
-            ]
-            lower_right = [
-                68, 69, 70, 71, 72,
-                78, 79, 80, 81, 82,
-                89, 90, 91, 92, 93,
-                99, 100, 101, 102, 103
-            ]
-            aggr_set = [upper_left, upper_right, lower_left, lower_right]
             agent = SarsaRSSarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions,
                                       args.temperature, rng, aggr_set)
 
@@ -185,10 +161,10 @@ if __name__ == '__main__':
     parser.add_argument('--rho', default=0.05, type=float)
     args = parser.parse_args()
     env_dir = prep_dir(os.path.join("res", "env"))
-    val_dir = prep_dir(os.path.join("res", "values"))
-    episode_dir = prep_dir(os.path.join("res", "episode"))
-    policy_dir = prep_dir(os.path.join("res", "policy"))
-    analysis_dir = prep_dir(os.path.join("res", "analysis"))
-    steps_dir = prep_dir(os.path.join("res", "steps"))
-    runtimes_dir = prep_dir(os.path.join("res", "runtime"))
+    val_dir = prep_dir(os.path.join("res", "values", args.id))
+    episode_dir = prep_dir(os.path.join("res", "episode", args.id))
+    policy_dir = prep_dir(os.path.join("res", "policy", args.id))
+    analysis_dir = prep_dir(os.path.join("res", "analysis", args.id))
+    steps_dir = prep_dir(os.path.join("res", "steps", args.id))
+    runtimes_dir = prep_dir(os.path.join("res", "runtime", args.id))
     main()
