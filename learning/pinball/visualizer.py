@@ -20,7 +20,7 @@ class Visualizer(object):
         self.action_dist = self.ax.bar(x, y)
         plt.xticks(x, self.action_label)
         self.ax.set_ylim([0,1])
-        print(self.action_label)
+        # print(self.action_label)
     
     def init_option_q_vis(self):
         self.op_ax = plt.subplot2grid((1,2),(0,1))
@@ -30,7 +30,7 @@ class Visualizer(object):
         self.opt_q = self.op_ax.bar(x,y)
         plt.xticks(x, self.option_label)
         self.op_ax.set_ylim([0,1])
-        print(self.option_label)
+        # print(self.option_label)
         
     def set_action_dist(self, action_dist, action):
         for i, i_action in enumerate(self.action_dist):

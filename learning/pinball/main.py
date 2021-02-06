@@ -13,11 +13,13 @@ import itertools
 from entity.ac_agent import SubgoalACAgent, \
                             ActorCriticAgent, \
                             NaiveSubgoalACAgent, \
-                            SarsaRSACAgent
+                            SarsaRSACAgent,\
+                            SRSACAgent
 from entity.mapping import Mapper
 import gym_pinball
 from tqdm import tqdm, trange
 from visualizer import Visualizer
+from concurrent.futures import ProcessPoolExecutor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,7 +33,8 @@ ALG_CHOICES = [
     "subgoal",
     "naive",
     "actor-critic",
-    "sarsa-rs"
+    "sarsa-rs",
+    "srs"
 ]
 
 
@@ -68,6 +71,26 @@ def load_subgoals(file_path):
     return subg_serieses
 
 
+def load_subgoals_new(file_path):
+    logger.info(f"Loading {file_path}")
+    subgoals_df = pd.read_csv(file_path)
+    subgoals = subgoals_df.groupby(["user_id", "task_id"]).agg(list)
+    xs = subgoals["x"].values.tolist()
+    ys = subgoals["y"].values.tolist()
+    rads = subgoals["rad"].values.tolist()
+    subg_serieses = []
+    for x, y, rad in zip(xs, ys, rads):
+        subg_series = []
+        for x_i, y_i, rad_i in zip(x, y, rad):
+            subg_series.append(
+                np.array([
+                    x_i, y_i, np.nan, np.nan
+                ])
+            )
+        subg_serieses.append(subg_series)
+    return subg_serieses
+
+
 def get_file_names(exe_id, l_id, run, eta=None, rho=None, k=None):
     fnames = {}
     for _type in OUTPUT_TYPES:
@@ -83,30 +106,31 @@ def get_file_names(exe_id, l_id, run, eta=None, rho=None, k=None):
     return fnames
 
 
-def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, subgoals, l_id, k):
-    logger.info(f"start run {run}")
+def learning_loop(args):
+    run, env_id, episode_count, model, visual, exe_id, rho, eta, subgoals, l_id, k = args
+    logger.debug(f"start run {run}")
     subg_confs = list(itertools.chain.from_iterable(subgoals))
     env = gym.make(env_id, subg_confs=subg_confs)
     outdir = '/tmp/random-agent-results'
     env = wrappers.Monitor(env, directory=outdir, force=True)
     env.seed(0)
     if "subgoal" == exe_id:
-        logger.info("Subgoal AC Agent")
+        logger.debug("Subgoal AC Agent")
         agent = SubgoalACAgent(run, env.action_space, env.observation_space, rho=rho, eta=eta, subgoals=subgoals)
         fnames = get_file_names(exe_id, l_id, run)
     elif "actor-critic" == exe_id:
-        logger.info("Actor-Critic Agent")
+        logger.debug("Actor-Critic Agent")
         agent = ActorCriticAgent(run, env.action_space, env.observation_space)
         fnames = get_file_names(exe_id, l_id, run)
     elif "naive" == exe_id:
-        logger.info("Naive Subgoal AC Agent")
+        logger.debug("Naive Subgoal AC Agent")
         agent = NaiveSubgoalACAgent(run, env.action_space, env.observation_space, rho=rho, eta=eta, subgoals=subgoals)
         fnames = get_file_names(exe_id, l_id, run, eta, rho)
-    elif "sarsa-rs" == exe_id:
-        logger.info("Sarsa RS AC Agent")
+    elif "sarsa-rs" in exe_id:
+        logger.debug("Sarsa RS AC Agent")
         params = {
             "vid": "table",
-            "aggr_id": "disc",
+            "aggr_id": "ndisc",
             "params": {
                 "env": env,
                 "n": k
@@ -116,6 +140,24 @@ def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, s
             run, env.action_space, env.observation_space, env, params
         )
         fnames = get_file_names(exe_id, l_id, run, k=k)
+    elif "srs" in exe_id:
+        logger.debug("Subgoal-based Reward Shaping AC Agent")
+        params = {
+            "vid": "table",
+            "aggr_id": "dta",
+            "eta": eta,
+            "rho": rho,
+            "params":{
+                "env_id": env.spec.id,
+                "_range": 0.04,
+                "n_obs": env.observation_space.shape[0],
+                "subgoals": subgoals
+            }
+        }
+        agent = SRSACAgent(
+            run, env, params
+        )
+        fnames = get_file_names(exe_id, l_id, run, eta, rho)
     else:
         raise NotImplemented
 
@@ -132,7 +174,7 @@ def learning_loop(run, env_id, episode_count, model, visual, exe_id, rho, eta, s
     max_q = 0.0
     saved_dir = "data"
     start_time = time.time()
-    for i in trange(episode_count):
+    for i in range(episode_count):
         total_reward = 0
         total_shaped_reward = 0
         n_steps = 0
@@ -198,28 +240,39 @@ def main():
     parser.add_argument('--model', help='Input model dir path')
     parser.add_argument('--nepisodes', default=250, type=int)
     parser.add_argument('--nruns', default=25, type=int)
-    parser.add_argument('--id', choices=ALG_CHOICES)
+    parser.add_argument('--id') # , choices=ALG_CHOICES
     parser.add_argument('--subg-path', default='', type=str)
     parser.add_argument('--eta', default=10000, type=int)
     parser.add_argument('--rho', default=0.01, type=int)
-    parser.add_argument('--k', type=int, required=True, help='How many to discretize the observation related to space.')
+    parser.add_argument('--k', type=int, help='How many to discretize the observation related to space.')
     
     args = parser.parse_args()
     learning_time = time.time()
-    if len(args.subg_path) == 0:
-        logger.info("Nothing subgoal path.")
+    if "srs" in args.id:
+        subg_serieses = load_subgoals_new(args.subg_path)
+    elif len(args.subg_path) == 0:
+        logger.debug("Nothing subgoal path.")
         subg_serieses = [[[{"pos_x":0.512, "pos_y": 0.682, "rad":0.04}, {"pos_x":0.683, "pos_y":0.296, "rad":0.04}]]] # , {"pos_x":0.9 , "pos_y":0.2 ,"rad": 0.04}
     else:
         subg_serieses = load_subgoals(args.subg_path)
     
     for l_id, subg_series in enumerate(subg_serieses):
-        logger.info(f"learning: {l_id+1}/{len(subg_serieses)}")
-        logger.info(f"subgoals: {subg_series}")
-        for run in range(args.nruns):
-            logger.info(f"Run: {run+1}/{args.nruns}")
-            learning_loop(run, args.env_id, args.nepisodes, args.model,
-                            args.vis, args.id, args.rho, args.eta, subg_series, l_id, args.k)
-            # Close the env and write monitor result info to disk
+        logger.debug(f"learning: {l_id+1}/{len(subg_serieses)}")
+        logger.debug(f"subgoals: {subg_series}")
+        arguments = [
+            [
+                run, args.env_id, args.nepisodes, args.model,
+                args.vis, args.id, args.rho, args.eta, subg_series, l_id, args.k
+            ]
+            for run in range(args.nruns)
+        ]
+        with ProcessPoolExecutor() as executor:
+            tqdm(executor.map(learning_loop, arguments), total=args.nruns)
+        # for run in range(args.nruns):
+        #     logger.debug(f"Run: {run+1}/{args.nruns}")
+        #     learning_loop(run, args.env_id, args.nepisodes, args.model,
+        #                     args.vis, args.id, args.rho, args.eta, subg_series, l_id, args.k)
+        #     # Close the env and write monitor result info to disk
     duration = time.time() - learning_time
     logger.info("Learning time: {}m {}s".format(int(duration//60), int(duration%60)))
 

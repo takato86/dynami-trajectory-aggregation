@@ -12,7 +12,7 @@ from .reward_shaping import SubgoalPotentialRewardShaping,\
                             SubgoalSarsaRewardShaping,\
                             NaiveRewardShaping, \
                             SarsaRewardShaping
-from shaner import SarsaRS
+from shaner import SarsaRS, SubgoalRS
 
 logger = logging.getLogger(__name__)
 
@@ -217,3 +217,18 @@ class NaiveSubgoalACAgent(SubgoalACAgent):
                          epsilon, gamma, gamma_v, lr_theta, lr_q, lr_v, eta,
                          rho, subgoals)
         self.reward_shaping = NaiveRewardShaping(subgoals, gamma, eta)
+
+
+class SRSACAgent(ActorCriticAgent):
+    def __init__(self, seed, env, params, basis_order=3,
+                 epsilon=0.01, gamma=0.99, gamma_v=0.99, lr_theta=0.01,
+                 lr_q=0.01, lr_v=0.01):
+        action_space= env.action_space
+        observation_space = env.observation_space 
+        super().__init__(seed, action_space, observation_space, basis_order, epsilon, gamma, lr_theta, lr_q)
+        self.reward_shaping = SubgoalRS(gamma, lr_v, env, params)
+
+    def update(self, pre_obs, pre_a, r, obs, a, done):
+        f = self.reward_shaping.perform(pre_obs, obs, r, done)
+        super().update(pre_obs, pre_a, r+f, obs, a, done)
+        return r+f

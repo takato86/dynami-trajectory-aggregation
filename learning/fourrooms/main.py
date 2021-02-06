@@ -12,7 +12,9 @@ from tqdm import tqdm, trange
 from entity.sg_parser import parser
 import matplotlib.pyplot as plt
 from entity.sarsa_agent import SubgoalRSSarsaAgent, SarsaAgent, NaiveSubgoalSarsaAgent,\
-                               SarsaRSSarsaAgent
+                               SarsaRSSarsaAgent, SRSSarsaAgent
+from concurrent.futures import ProcessPoolExecutor
+
 
 '''
 avg_duration: 1つのOptionが続けられる平均ステップ数
@@ -30,13 +32,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 inifile = configparser.ConfigParser()
 inifile.read("../../config.ini")
-
-
-# def export_env(file_path, env):
-#     to_state = np.full(env.occupancy.shape, -1)
-#     for k, val in env.tostate.items():
-#         to_state[k[0]][k[1]] = val
-#     pd.DataFrame(to_state).to_csv(file_path)
 
 
 def export_steps(file_path, steps):
@@ -68,35 +63,15 @@ def load_subgoals(file_path, task_id=None):
 
 
 def learning_loop(env, agent, nruns, nepisodes, nsteps, 
-                  id, env_id, learn_id): 
+                  id, env_id, learn_id, nprocess=None): 
     runtimes = []
-    for run in trange(nruns):
-        start_time = time.time()
-        agent.reset()
-        steps = []
-        for episode in range(nepisodes):
-            next_observation = env.reset()
-            logger.debug(f"start state: {next_observation}")
-            cumreward = 0
-            logger.debug(f"goal is at {env.goal}")
-            for step in range(nsteps):
-                observation = next_observation
-                action = agent.act(observation)
-                next_observation, reward, done, _ = env.step(action)
-                # Critic update
-                agent.update(observation, action, next_observation, reward, done)
-                cumreward += reward
-                if done:
-                    logger.debug("true goal: {}, actual goal: {}, reward: {}"
-                          .format(env.goal, next_observation, reward))
-                    break
-            steps.append(step)
-            logger.debug('Run {} episode {} steps {} cumreward {}'
-                  .format(run, episode, step, agent.total_shaped_reward))
-        runtimes.append(time.time() - start_time)
-        export_steps(os.path.join(steps_dir,
-                                  f"{env_id}-{learn_id}-{run}-{id}.csv"),
-                     steps)
+    args = [
+        [run, env, agent, nepisodes, nsteps, id, env_id, learn_id]
+        for run in range(nruns)
+    ]
+    with ProcessPoolExecutor(max_workers=nprocess) as executor:
+        ret = tqdm(executor.map(run_loop, args), total=nruns)
+    runtimes = list(ret)
     export_runtimes(
         os.path.join(
             runtimes_dir,
@@ -104,6 +79,38 @@ def learning_loop(env, agent, nruns, nepisodes, nsteps,
         ),
         runtimes
     )
+
+
+def run_loop(args):
+    run, env, agent, nepisodes, nsteps, id, env_id, learn_id = args
+    start_time = time.time()
+    agent.reset()
+    steps = []
+    runtimes = []
+    for episode in range(nepisodes):
+        next_observation = env.reset()
+        logger.debug(f"start state: {next_observation}")
+        cumreward = 0
+        logger.debug(f"goal is at {env.goal}")
+        for step in range(nsteps):
+            observation = next_observation
+            action = agent.act(observation)
+            next_observation, reward, done, _ = env.step(action)
+            # Critic update
+            agent.update(observation, action, next_observation, reward, done)
+            cumreward += reward
+            if done:
+                logger.debug("true goal: {}, actual goal: {}, reward: {}"
+                        .format(env.goal, next_observation, reward))
+                break
+        steps.append(step)
+        logger.debug('Run {} episode {} steps {} cumreward {}'
+                .format(run, episode, step, agent.total_shaped_reward))
+    runtimes.append(time.time() - start_time)
+    export_steps(os.path.join(steps_dir,
+                                f"{env_id}-{learn_id}-{run}-{id}.csv"),
+                    steps)
+    return runtimes
 
 
 def main():
@@ -120,10 +127,10 @@ def main():
     # export_env(os.path.join(env_dir, f"{args.env_id}.csv"), env_to_wrap)
     nfeatures, nactions = env.observation_space.n, env.action_space.n
     subgoals = [[]]
-    if "subgoal" == args.id or "naive" == args.id:
+    if "subgoal" in args.id or "naive" == args.id or "srs" in args.id:
         subgoals = load_subgoals(args.subgoal_path, task_id=1)
         logger.info(f"subgoals: {subgoals}")
-    elif "sarsa-rs" == args.id:
+    elif "sarsa-rs" in args.id:
         json_open = open(args.mapping_path)
         aggr_set = [l for _, l in json.load(json_open).items()]
         logger.info(f"mappings: {aggr_set}")
@@ -137,18 +144,21 @@ def main():
             logger.info("NaiveSubgoalSarsaAgent")
             agent = NaiveSubgoalSarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions,
                                     args.temperature, rng, subgoal, args.eta, args.rho, subgoal_values=None)
-        elif "subgoal" == args.id:
+        elif "subgoal" in args.id:
             logger.info("SubgoalRSSarsaAgent")
             agent = SubgoalRSSarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions,
                                     args.temperature, rng, subgoal, args.eta, args.rho, subgoal_values=None)
         elif "sarsa" == args.id:
             logger.debug("SarsaAgent")
             agent = SarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions, args.temperature, rng)
-        elif "sarsa-rs" == args.id:
+        elif "sarsa-rs" in args.id:
             logger.debug("SarsaRSAgent")
             agent = SarsaRSSarsaAgent(args.discount, args.epsilon, args.lr_critic, nfeatures, nactions,
                                       args.temperature, rng, aggr_set)
-
+        elif "srs" in args.id:
+            logger.debug("Subgoal Reward Shaping")
+            agent = SRSSarsaAgent(args.discount, args.epsilon, args.lr_critic, env, args.temperature, rng, args.eta, args.rho, subgoal)
+    
         learning_loop(env, agent, args.nruns, args.nepisodes, args.nsteps,
                       args.id, args.env_id, learn_id)
     env.close()
@@ -157,7 +167,7 @@ def main():
 if __name__ == '__main__':
     parser.add_argument('--ac', action='store_true')
     parser.add_argument('--video', action='store_true')
-    parser.add_argument('--id', default='no_name', choices=ALG_CHOICES, type=str)
+    parser.add_argument('--id', default='no_name', type=str)  # , choices=ALG_CHOICES
     parser.add_argument('--rho', default=0.05, type=float)
     args = parser.parse_args()
     env_dir = prep_dir(os.path.join("res", "env"))

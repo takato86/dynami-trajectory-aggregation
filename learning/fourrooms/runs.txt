@@ -28,8 +28,6 @@ python main.py --discount=0.99 --epsilon=$EPSILON --lr_critic=0.25\
                --id=$ALG
 
 [Sarsa on DiagonalPartialFour]
-ETA=1.0
-RHO=0.001
 EPSILON=0.05
 NRUNS=1000  # 100 * 10
 NEPISODES=1000
@@ -42,8 +40,6 @@ python main.py --discount=0.99 --epsilon=$EPSILON --lr_critic=0.25\
                --id=$ALG
 
 [Sarsa-rs on DiagonalFour]
-ETA=1.0
-RHO=0.001
 EPSILON=0.05
 NRUNS=1000  # 100 * 10
 NEPISODES=1000
@@ -130,3 +126,18 @@ python main.py --discount=0.99 --epsilon=$EPSILON --lr_critic=0.25\
                --env_id=$RLENV \
                --subgoal-path="in/subgoals/diagonalpartialfourrooms_optimal_subgoals.csv" \
                --id=$ALG
+
+[SRS on ConstFourrooms]
+ETA=1.0
+RHO=0.001
+EPSILON=0.05
+NRUNS=100
+NEPISODES=1000
+ALG="srs-human"
+RLENV="ConstFourrooms-v0"
+echo "${ALG} on ${RLENV}"
+python main.py --discount=0.99 --epsilon=$EPSILON --lr_critic=0.25\
+               --nruns=$NRUNS --nsteps=10000 --nepisodes=$NEPISODES \
+               --env_id=$RLENV --eta=$ETA --rho=$RHO\
+               --subgoal-path="in/subgoals/fourrooms_human_subgoals.csv" \
+               --id=$ALG 

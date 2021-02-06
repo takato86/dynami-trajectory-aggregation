@@ -6,7 +6,7 @@ from .tabular import Tabular
 from .reward_shaping import NaiveSubgoalRewardShaping,\
                             SubgoalSarsaRewardShaping,\
                             SarsaRewardShaping
-
+import shaner
 import csv
 
 logger = logging.getLogger(__name__)
@@ -41,8 +41,13 @@ class SarsaAgent:
     
     def reset(self):
         rng = np.random.RandomState(np.random.randint(0, 100))
-        self.__init__(self.discount, self.epsilon, self.lr, self.nfeatures, self.nactions,
-                      self.temperature, rng, self.q_value)
+        self.policy = SoftmaxPolicy(rng, self.nfeatures, self.nactions, self.temperature)
+        self.critic = Sarsa(self.discount, self.lr, self.policy.weights)
+        self.features = Tabular(self.nfeatures)
+        self.total_shaped_reward = 0
+        for state, value in self.q_value.items():
+            phi = self.features(state)
+            self.critic.initialize(phi, value)
     
 
 class SubgoalRSSarsaAgent(SarsaAgent):
@@ -131,3 +136,30 @@ class SarsaRSSarsaAgent(SarsaAgent):
         rng = np.random.RandomState(np.random.randint(0, 100))
         self.__init__(self.discount, self.epsilon, self.lr, self.nfeatures, self.nactions,
                       self.temperature, rng, self.aggr_set)
+
+class SRSSarsaAgent(SarsaAgent):
+    def __init__(self, discount, epsilon, lr, env, temperature, rng, eta, rho, subgoals):
+        nfeatures = env.observation_space.n
+        nactions = env.action_space.n
+        super().__init__(discount, epsilon, lr, nfeatures, nactions, temperature, rng)
+        params = {
+            'vid': 'table',
+            'aggr_id': 'dta',
+            'eta': eta,
+            'rho': rho,
+            'params': {
+                'env_id': env.spec.id,
+                '_range': 0,
+                'n_obs': nfeatures,
+                'subgoals': subgoals
+            }
+        }
+        self.reward_shaping = shaner.SubgoalRS(lr, discount, env, params)
+    
+    def update(self, state, action, next_state, reward, done):
+        F = self.reward_shaping.perform(state, next_state, reward, done)
+        super().update(state, action, next_state, reward + F, done)
+    
+    def reset(self):
+        super().reset()
+        self.reward_shaping.reset()
