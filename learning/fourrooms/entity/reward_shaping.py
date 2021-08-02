@@ -89,9 +89,9 @@ class NaiveSubgoalRewardShaping(SubgoalReward):
         return additional_reward
 
 
-class SubgoalSarsaRewardShaping(SubgoalReward):
+class DTARewardShaping(SubgoalReward):
     def __init__(self, discount, eta, subgoal_serieses, nfeatures, discount_v, lr_v, subgoal_values=None):
-        logger.debug("SubgoalSarsaRewardShaping!")
+        logger.debug("DTARewardShaping!")
         super().__init__(discount, eta, subgoal_serieses, nfeatures)
         self.discount_v = discount_v
         self.lr_v = lr_v

@@ -236,6 +236,7 @@ def learning_loop(args):
 
 
 def main():
+    logger.info("ENV: {}".format(args.env_id))
     learning_time = time.time()
     if "srs" in args.id:
         subg_serieses = load_subgoals_new(args.subg_path)
