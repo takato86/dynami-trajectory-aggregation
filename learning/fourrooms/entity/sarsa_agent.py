@@ -54,9 +54,13 @@ class SarsaAgent:
 
     def get_min_value(self):
         return np.amin(self.critic.weights)
-    
-    def info(self):
-        pass
+
+    def info(self, state):
+        phi = self.features(state)
+        return {
+            "state": state,
+            "v": max(self.critic.value(phi))
+        }
 
 
 class SubgoalRSSarsaAgent(SarsaAgent):
@@ -86,6 +90,14 @@ class SubgoalRSSarsaAgent(SarsaAgent):
         rng = np.random.RandomState(np.random.randint(0, 100))
         self.__init__(self.discount, self.epsilon, self.lr, self.nfeatures, self.nactions,
                       self.temperature, rng, self.subgoals, self.eta, self.rho, self.subgoal_values)
+
+    def info(self, state):
+        phi = self.features(state)
+        return {
+            "state": state,
+            "v_z": self.reward_shaping.subgoal_values[self.reward_shaping.curr_index[0]][self.reward_shaping.curr_index[1]],
+            "v": max(self.critic.value(phi))
+        }
 
 
 class NaiveSubgoalSarsaAgent(SubgoalRSSarsaAgent):
@@ -165,7 +177,7 @@ class SRSSarsaAgent(SarsaAgent):
             'rho': rho,
             'params': {
                 'achiever': TworoomsAchiever(float(config["SHAPING"]["_range"]),
-                                             nfeatures, subgoals)
+                                             nfeatures, subgoals),
             }
         }
         self.reward_shaping = shaner.SubgoalRS(lr, discount, env, params)
@@ -179,3 +191,11 @@ class SRSSarsaAgent(SarsaAgent):
     def reset(self):
         super().reset()
         self.reward_shaping.reset()
+
+    def info(self, state):
+        phi = self.features(state)
+        return {
+            "state": state,
+            "v_z": self.reward_shaping.potential(self.reward_shaping.aggregater.current_state),
+            "v": max(self.critic.value(phi))
+        }

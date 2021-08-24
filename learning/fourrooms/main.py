@@ -26,6 +26,11 @@ def export_runtimes(file_path, runtimes):
     runtimes_df.to_csv(file_path)
 
 
+def export_details(file_path, details):
+    detail_df = pd.DataFrame.from_dict(details, orient="index")
+    detail_df.to_csv(file_path)
+
+
 def prep_dir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
@@ -77,6 +82,7 @@ def run_loop(args):
     agent.reset()
     steps = []
     runtimes = []
+    details = {}
     for episode in range(nepisodes):
         next_observation = env.reset()
         logger.debug(f"start: {next_observation}, goal: {env.goal}")
@@ -87,6 +93,12 @@ def run_loop(args):
             next_observation, reward, done, _ = env.step(action)
             # Critic update
             agent.update(observation, action, next_observation, reward, done)
+            info = agent.info(observation)
+            if info:
+                ind = episode * nepisodes + step
+                info["episode"] = episode
+                info["step"] = step
+                details[ind] = info
             cumreward += reward
             if done:
                 break
@@ -104,6 +116,13 @@ def run_loop(args):
         ),
         steps
     )
+    export_details(
+        os.path.join(
+            detail_dir,
+            f"{env_id}-{learn_id}-{run}-{id}.csv"
+        ),
+        details
+    )
     return runtimes
 
 
@@ -118,7 +137,7 @@ def main():
     if config.getboolean("ENV", "video"):
         movie_folder = prep_dir(
             os.path.join(
-                'res', 'movies', config["SHAPING"]["alg"]
+                'out', 'movies', config["SHAPING"]["alg"]
             )
         )
         env = wrappers.Monitor(
@@ -213,4 +232,5 @@ if __name__ == '__main__':
     out_dir = prep_dir(os.path.join("out", config["SHAPING"]["alg"]))
     steps_dir = prep_dir(os.path.join(out_dir, "steps"))
     runtimes_dir = prep_dir(os.path.join(out_dir, "runtime"))
+    detail_dir = prep_dir(os.path.join(out_dir, "detail"))
     main()

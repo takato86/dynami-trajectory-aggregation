@@ -106,7 +106,7 @@ class DTARewardShaping(SubgoalReward):
         self.pre_index = (0, 0)
         self.time = 0
         self.subgoal_serieses = [[]] + self.subgoal_serieses
-    
+
     def value(self, state, done):
         potential = self.subgoal_values[self.curr_index[0]][ self.curr_index[1]]
         pre_potential = self.subgoal_values[self.pre_index[0]][self.pre_index[1]]
