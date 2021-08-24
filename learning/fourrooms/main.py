@@ -7,8 +7,8 @@ import logging
 import os
 import json
 import time
+import argparse
 from tqdm import tqdm
-from utils.parser import parser
 from utils.config import config
 from entity.sarsa_agent import SubgoalRSSarsaAgent, SarsaAgent,\
                                NaiveSubgoalSarsaAgent,\
@@ -204,6 +204,8 @@ def main():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, required=True)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
