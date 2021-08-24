@@ -49,6 +49,15 @@ class SarsaAgent:
             phi = self.features(state)
             self.critic.initialize(phi, value)
 
+    def get_max_value(self):
+        return np.amax(self.critic.weights)
+
+    def get_min_value(self):
+        return np.amin(self.critic.weights)
+    
+    def info(self):
+        pass
+
 
 class SubgoalRSSarsaAgent(SarsaAgent):
     def __init__(self, discount, epsilon, lr, nfeatures, nactions, temperature, rng, subgoals, eta, rho=0, subgoal_values=None):
@@ -58,7 +67,9 @@ class SubgoalRSSarsaAgent(SarsaAgent):
         self.eta = eta
         self.rho = rho
         self.subgoal_values = subgoal_values
-        self.reward_shaping = DTARewardShaping(discount, eta, subgoals, nfeatures, discount, lr)
+        self.reward_shaping = DTARewardShaping(
+            discount, eta, subgoals, nfeatures, discount, lr
+        )
 
     def update(self, state, action, next_state, reward, done):
         phi = self.features(state)
@@ -67,7 +78,9 @@ class SubgoalRSSarsaAgent(SarsaAgent):
         reward += self.reward_shaping.value(next_state, done)
         next_action = self.act(next_state)
         self.total_shaped_reward += reward
-        _ = self.critic.update(phi, action, next_phi, reward, done, next_action)
+        _ = self.critic.update(
+            phi, action, next_phi, reward, done, next_action
+        )
 
     def reset(self):
         rng = np.random.RandomState(np.random.randint(0, 100))
@@ -159,6 +172,8 @@ class SRSSarsaAgent(SarsaAgent):
 
     def update(self, state, action, next_state, reward, done):
         F = self.reward_shaping.perform(state, next_state, reward, done)
+        if np.random.rand() < 0.001:
+            logger.debug("shaping reward: {}".format(F))
         super().update(state, action, next_state, reward + F, done)
 
     def reset(self):

@@ -45,7 +45,7 @@ def load_subgoals(file_path, task_id=None):
 
 
 def learning_loop(env, agent, nruns, nepisodes, nsteps,
-                  id, env_id, learn_id, nprocess=None):
+                  id, env_id, learn_id, nprocess):
     runtimes = []
     args = [
         [run, env, agent, nepisodes, nsteps, id, env_id, learn_id]
@@ -79,9 +79,8 @@ def run_loop(args):
     runtimes = []
     for episode in range(nepisodes):
         next_observation = env.reset()
-        logger.debug(f"start state: {next_observation}")
+        logger.debug(f"start: {next_observation}, goal: {env.goal}")
         cumreward = 0
-        logger.debug(f"goal is at {env.goal}")
         for step in range(nsteps):
             observation = next_observation
             action = agent.act(observation)
@@ -90,15 +89,11 @@ def run_loop(args):
             agent.update(observation, action, next_observation, reward, done)
             cumreward += reward
             if done:
-                logger.debug(
-                    "true goal: {}, actual goal: {}, reward: {}".format(
-                        env.goal, next_observation, reward
-                    )
-                )
                 break
         steps.append(step)
-        logger.debug('Run {} episode {} steps {} cumreward {}'.format(
-                run, episode, step, agent.total_shaped_reward
+        logger.debug('Run {} episode {} steps {}, cumreward {:.4f}, min_Q: {:.4f}, max_Q: {:.4f}'.format(
+                run, episode, step, cumreward,
+                agent.get_min_value(), agent.get_max_value()
             )
         )
     runtimes.append(time.time() - start_time)
@@ -120,7 +115,7 @@ def main():
     )
     env_to_wrap = gym.make(config["ENV"]["env_id"])
     # env_to_wrap.env.init_states = [0]
-    if bool(config["ENV"]["video"]):
+    if config.getboolean("ENV", "video"):
         movie_folder = prep_dir(
             os.path.join(
                 'res', 'movies', config["SHAPING"]["alg"]
@@ -159,7 +154,7 @@ def main():
         if "naive" == config["SHAPING"]["alg"]:
             logger.info("NaiveSubgoalSarsaAgent")
             agent = NaiveSubgoalSarsaAgent(
-                config["ENV"]["env_id"],
+                float(config["AGENT"]["discount"]),
                 float(config["AGENT"]["epsilon"]),
                 float(config["AGENT"]["lr"]), nfeatures, nactions,
                 float(config["AGENT"]["temperature"]), rng, subgoal,
@@ -168,30 +163,30 @@ def main():
         elif "subgoal" in config["SHAPING"]["alg"]:
             logger.info("SubgoalRSSarsaAgent")
             agent = SubgoalRSSarsaAgent(
-                config["ENV"]["env_id"],
+                float(config["AGENT"]["discount"]),
                 float(config["AGENT"]["epsilon"]),
                 float(config["AGENT"]["lr"]), nfeatures, nactions,
                 float(config["AGENT"]["temperature"]), rng, subgoal,
                 float(config["SHAPING"]["eta"]), float(config["SHAPING"]["rho"]),
                 subgoal_values=None)
-        elif "sarsa" == config["SHAPING"]["alg"]:
-            logger.debug("SarsaAgent")
-            agent = SarsaAgent(
-                config["ENV"]["env_id"],
-                float(config["AGENT"]["epsilon"]),
-                float(config["AGENT"]["lr"]), nfeatures, nactions,
-                float(config["AGENT"]["temperature"]), rng)
         elif "sarsa-rs" in config["SHAPING"]["alg"]:
             logger.debug("SarsaRSAgent")
             agent = SarsaRSSarsaAgent(
-                config["ENV"]["env_id"],
+                float(config["AGENT"]["discount"]),
                 float(config["AGENT"]["epsilon"]),
                 float(config["AGENT"]["lr"]), nfeatures, nactions,
                 float(config["AGENT"]["temperature"]), rng, aggr_set)
+        elif "sarsa" in config["SHAPING"]["alg"]:
+            logger.debug("SarsaAgent")
+            agent = SarsaAgent(
+                float(config["AGENT"]["discount"]),
+                float(config["AGENT"]["epsilon"]),
+                float(config["AGENT"]["lr"]), nfeatures, nactions,
+                float(config["AGENT"]["temperature"]), rng)
         elif "srs" in config["SHAPING"]["alg"]:
             logger.debug("Subgoal Reward Shaping")
             agent = SRSSarsaAgent(
-                config["ENV"]["env_id"],
+                float(config["AGENT"]["discount"]),
                 float(config["AGENT"]["epsilon"]),
                 float(config["AGENT"]["lr"]), env,
                 float(config["AGENT"]["temperature"]),
@@ -202,7 +197,8 @@ def main():
             env, agent, int(config["AGENT"]["nruns"]),
             int(config["AGENT"]["nepisodes"]),
             int(config["AGENT"]["nsteps"]), config["SHAPING"]["alg"],
-            config["ENV"]["env_id"], learn_id
+            config["ENV"]["env_id"], learn_id,
+            int(config["ENV"]["nprocess"])
         )
     env.close()
 

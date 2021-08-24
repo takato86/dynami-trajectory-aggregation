@@ -1,6 +1,8 @@
+import logging
 import numpy as np
-from scipy.special import expit
 from scipy.special import logsumexp
+
+logger = logging.getLogger(__name__)
 
 
 class BasePolicy:
@@ -68,7 +70,11 @@ class SoftmaxPolicy(BasePolicy):
 
     def sample(self, phi):
         max_action = np.argmax(self.weights.shape[1])
-        actual_action = int(self.rng.choice(self.weights.shape[1], p=self.pmf(phi)))
+        if np.random.rand() < 0.001:
+            logger.debug(self.pmf(phi))
+        actual_action = int(
+            self.rng.choice(self.weights.shape[1], p=self.pmf(phi))
+        )
         if max_action == actual_action:
             self.exploit_count += 1
         else:
