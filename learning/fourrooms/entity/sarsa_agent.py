@@ -33,7 +33,7 @@ class SarsaAgent:
     def act(self, state):
         return self.policy.sample(self.features(state))
 
-    def update(self, state, action, next_state, reward, done):
+    def update(self, state, action, next_state, reward, done, info):
         phi = self.features(state)
         next_phi = self.features(next_state)
         next_action = self.act(next_state)
@@ -75,7 +75,7 @@ class SubgoalRSSarsaAgent(SarsaAgent):
             discount, eta, subgoals, nfeatures, discount, lr
         )
 
-    def update(self, state, action, next_state, reward, done):
+    def update(self, state, action, next_state, reward, done, info):
         phi = self.features(state)
         next_phi = self.features(next_state)
         self.reward_shaping.fit(next_state, reward, done)
@@ -146,47 +146,50 @@ class Sarsa:
 class SarsaRSSarsaAgent(SarsaAgent):
     def __init__(self, discount, epsilon, lr, nfeatures, nactions, temperature, rng, aggr_set):
         logger.debug("SarsaRSSarsaAgent is going to perform!")
-        super().__init__(discount, epsilon, lr, nfeatures, nactions, temperature, rng)
+        super().__init__(
+            discount, epsilon, lr, nfeatures, nactions, temperature, rng
+        )
         self.aggr_set = aggr_set
-        self.reward_shaping = SarsaRewardShaping(discount, nfeatures, discount, lr, aggr_set)
+        self.reward_shaping = SarsaRewardShaping(
+            discount, nfeatures, discount, lr, aggr_set
+        )
 
-    def update(self, state, action, next_state, reward, done):
+    def update(self, state, action, next_state, reward, done, info):
         phi = self.features(state)
         next_phi = self.features(next_state)
         self.reward_shaping.fit(next_state, reward, done)
         reward += self.reward_shaping.value(next_state, done)
         next_action = self.act(next_state)
         self.total_shaped_reward += reward
-        _ = self.critic.update(phi, action, next_phi, reward, done, next_action)
+        _ = self.critic.update(
+            phi, action, next_phi, reward, done, next_action
+        )
 
     def reset(self):
         rng = np.random.RandomState(np.random.randint(0, 100))
-        self.__init__(self.discount, self.epsilon, self.lr, self.nfeatures, self.nactions,
-                      self.temperature, rng, self.aggr_set)
+        self.__init__(self.discount, self.epsilon, self.lr, self.nfeatures,
+                      self.nactions, self.temperature, rng, self.aggr_set)
 
 
-class SRSSarsaAgent(SarsaAgent):
-    def __init__(self, discount, epsilon, lr, env, temperature, rng, eta, rho, subgoals):
+class ShapingSarsaAgent(SarsaAgent):
+    def __init__(self, discount, epsilon, lr, env, temperature, rng, subgoals):
         nfeatures = env.observation_space.n
         nactions = env.action_space.n
-        super().__init__(discount, epsilon, lr, nfeatures, nactions, temperature, rng)
-        params = {
-            'vid': config["SHAPING"]["vid"],
-            'aggr_id': config["SHAPING"]["aggr_id"],
-            'eta': eta,
-            'rho': rho,
-            'params': {
-                'achiever': TworoomsAchiever(float(config["SHAPING"]["_range"]),
-                                             nfeatures, subgoals),
-            }
-        }
-        self.reward_shaping = shaner.SubgoalRS(lr, discount, env, params)
+        super().__init__(
+            discount, epsilon, lr, nfeatures, nactions, temperature, rng
+        )
+        self.reward_shaping = self._generate_shaping(env, subgoals)
 
-    def update(self, state, action, next_state, reward, done):
-        F = self.reward_shaping.perform(state, next_state, reward, done)
+    def _generate_shaping(self, env, subgoals):
+        raise NotImplementedError
+
+    def update(self, state, action, next_state, reward, done, info):
+        F = self.reward_shaping.perform(
+            state, next_state, reward, done, info
+        )
         if np.random.rand() < 0.001:
             logger.debug("shaping reward: {}".format(F))
-        super().update(state, action, next_state, reward + F, done)
+        super().update(state, action, next_state, reward + F, done, info)
 
     def reset(self):
         super().reset()
@@ -196,6 +199,61 @@ class SRSSarsaAgent(SarsaAgent):
         phi = self.features(state)
         return {
             "state": state,
-            "v_z": self.reward_shaping.potential(self.reward_shaping.aggregater.current_state),
+            "v_z": self.reward_shaping.potential(
+                        self.reward_shaping.aggregater.current_state
+                   ),
             "v": max(self.critic.value(phi))
         }
+
+
+class SRSSarsaAgent(ShapingSarsaAgent):
+    def __init__(self, discount, epsilon, lr, env, temperature, rng, subgoals):
+        super().__init__(
+            discount, epsilon, lr, env, temperature, rng, subgoals
+        )
+
+    def _generate_shaping(self, env, subgoals):
+        nfeatures = env.observation_space.n
+        params = {
+            'vid': config["SHAPING"]["vid"],
+            'aggr_id': config["SHAPING"]["aggr_id"],
+            'eta': float(config["SHAPING"]["eta"]),
+            'rho': float(config["SHAPING"]["rho"]),
+            'params': {
+                'achiever': TworoomsAchiever(
+                                float(config["SHAPING"]["_range"]),
+                                nfeatures, subgoals
+                            )
+            }
+        }
+        return shaner.SubgoalRS(
+            float(config["AGENT"]["lr"]), float(config["AGENT"]["discount"]), env, params
+        )
+
+
+class DTAAgent(ShapingSarsaAgent):
+    def __init__(self, discount, epsilon, lr, env, temperature, rng, subgoals):
+        super().__init__(
+            discount, epsilon, lr, env, temperature, rng, subgoals
+        )
+
+    def _generate_shaping(self, env, subgoals):
+        nfeatures = env.observation_space.n
+        params = {
+            'vid': config["SHAPING"]["vid"],
+            'aggr_id': config["SHAPING"]["aggr_id"],
+            'params': {
+                'achiever': TworoomsAchiever(
+                                float(config["SHAPING"]["_range"]),
+                                nfeatures, subgoals
+                            )
+            },
+        }
+        return shaner.SarsaRS(
+            float(config["AGENT"]["lr"]), float(config["AGENT"]["discount"]),
+            env, params, is_success
+        )
+
+
+def is_success(done, info):
+    return done

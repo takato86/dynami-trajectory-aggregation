@@ -47,7 +47,7 @@ def export_csv(file_path, file_name, array):
 
 
 def moved_average(data, window_size):
-    b=np.ones(window_size)/window_size
+    b = np.ones(window_size)/window_size
     return np.convolve(data, b, mode='same')
 
 
@@ -242,7 +242,7 @@ def main():
         subg_serieses = load_subgoals_new(args.subg_path)
     elif len(args.subg_path) == 0:
         logger.debug("Nothing subgoal path.")
-        subg_serieses = [[[{"pos_x":0.512, "pos_y": 0.682, "rad":0.04}, {"pos_x":0.683, "pos_y":0.296, "rad":0.04}]]] # , {"pos_x":0.9 , "pos_y":0.2 ,"rad": 0.04}
+        subg_serieses = [[[{"pos_x": 0.512, "pos_y": 0.682, "rad": 0.04}, {"pos_x": 0.683, "pos_y": 0.296, "rad": 0.04}]]] # , {"pos_x":0.9 , "pos_y":0.2 ,"rad": 0.04}
     else:
         subg_serieses = load_subgoals(args.subg_path)
     
@@ -258,7 +258,7 @@ def main():
         ]
         with ProcessPoolExecutor() as executor:
             tqdm(executor.map(learning_loop, arguments), total=args.nruns)
-        
+
         # Single Process
         # for run in range(args.nruns):
         #     logger.debug(f"Run: {run+1}/{args.nruns}")
@@ -267,6 +267,7 @@ def main():
     duration = time.time() - learning_time
     logger.info("Learning time: {}m {}s".format(int(duration//60), int(duration%60)))
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Actor-Critic Learning.')
     parser.add_argument('env_id', nargs='?', default='Pinball-Subgoal-v0', help='Select the environment to run.')
@@ -274,12 +275,12 @@ if __name__ == '__main__':
     parser.add_argument('--model', help='Input model dir path')
     parser.add_argument('--nepisodes', default=250, type=int)
     parser.add_argument('--nruns', default=25, type=int)
-    parser.add_argument('--id') # , choices=ALG_CHOICES
+    parser.add_argument('--id')  # , choices=ALG_CHOICES
     parser.add_argument('--subg-path', default='', type=str)
     parser.add_argument('--eta', default=10000, type=float)
     parser.add_argument('--rho', default=0.01, type=float)
     parser.add_argument('--k', type=int, help='How many to discretize the observation related to space.')
-    
+
     args = parser.parse_args()
     saved_dir = os.path.join("out", args.id)
     d_kinds = {

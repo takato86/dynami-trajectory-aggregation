@@ -12,7 +12,8 @@ from tqdm import tqdm
 from utils.config import config
 from entity.sarsa_agent import SubgoalRSSarsaAgent, SarsaAgent,\
                                NaiveSubgoalSarsaAgent,\
-                               SarsaRSSarsaAgent, SRSSarsaAgent
+                               SarsaRSSarsaAgent, SRSSarsaAgent,\
+                               DTAAgent
 from concurrent.futures import ProcessPoolExecutor
 
 
@@ -90,15 +91,17 @@ def run_loop(args):
         for step in range(nsteps):
             observation = next_observation
             action = agent.act(observation)
-            next_observation, reward, done, _ = env.step(action)
+            next_observation, reward, done, info = env.step(action)
             # Critic update
-            agent.update(observation, action, next_observation, reward, done)
-            info = agent.info(observation)
-            if info:
+            agent.update(
+                observation, action, next_observation, reward, done, info
+            )
+            detail = agent.info(observation)
+            if detail:
                 ind = episode * nepisodes + step
-                info["episode"] = episode
-                info["step"] = step
-                details[ind] = info
+                detail["episode"] = episode
+                detail["step"] = step
+                details[ind] = detail
             cumreward += reward
             if done:
                 break
@@ -177,17 +180,18 @@ def main():
                 float(config["AGENT"]["epsilon"]),
                 float(config["AGENT"]["lr"]), nfeatures, nactions,
                 float(config["AGENT"]["temperature"]), rng, subgoal,
-                float(config["SHAPING"]["eta"]), float(config["SHAPING"]["rho"]),
+                float(config["SHAPING"]["eta"]),
+                float(config["SHAPING"]["rho"]),
                 subgoal_values=None)
         elif "subgoal" in config["SHAPING"]["alg"]:
-            logger.info("SubgoalRSSarsaAgent")
-            agent = SubgoalRSSarsaAgent(
+            logger.info("DTAAgent")
+            agent = DTAAgent(
                 float(config["AGENT"]["discount"]),
                 float(config["AGENT"]["epsilon"]),
-                float(config["AGENT"]["lr"]), nfeatures, nactions,
-                float(config["AGENT"]["temperature"]), rng, subgoal,
-                float(config["SHAPING"]["eta"]), float(config["SHAPING"]["rho"]),
-                subgoal_values=None)
+                float(config["AGENT"]["lr"]), env,
+                float(config["AGENT"]["temperature"]),
+                rng, subgoal
+            )
         elif "sarsa-rs" in config["SHAPING"]["alg"]:
             logger.debug("SarsaRSAgent")
             agent = SarsaRSSarsaAgent(
@@ -209,8 +213,7 @@ def main():
                 float(config["AGENT"]["epsilon"]),
                 float(config["AGENT"]["lr"]), env,
                 float(config["AGENT"]["temperature"]),
-                rng, float(config["SHAPING"]["eta"]),
-                float(config["SHAPING"]["rho"]), subgoal
+                rng, subgoal
             )
         learning_loop(
             env, agent, int(config["AGENT"]["nruns"]),
