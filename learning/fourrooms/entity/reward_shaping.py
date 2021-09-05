@@ -127,7 +127,8 @@ class DTARewardShaping(SubgoalReward):
             logger.debug(f"pre: {self.pre_index}, cur: {self.curr_index}, h_reward: {h_reward}")
             pre_y, pre_x = self.pre_index
             cur_y, cur_x = self.curr_index
-            if h_reward != 0:
+            # if h_reward != 0:
+            if reward > 0:
                 self.subgoal_values[pre_y][pre_x] \
                     = (1 - self.lr_v) * self.subgoal_values[pre_y][pre_x]\
                     + self.lr_v * h_reward

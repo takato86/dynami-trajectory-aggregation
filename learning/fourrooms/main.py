@@ -173,6 +173,7 @@ def main():
     for learn_id, subgoal in enumerate(subgoals):
         logger.info(f"Subgoal {learn_id+1}/{len(subgoals)}: {subgoal}")
         rng = np.random.RandomState(learn_id)
+
         if "naive" == config["SHAPING"]["alg"]:
             logger.info("NaiveSubgoalSarsaAgent")
             agent = NaiveSubgoalSarsaAgent(

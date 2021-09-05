@@ -250,10 +250,14 @@ class DTAAgent(ShapingSarsaAgent):
             },
         }
         return shaner.SarsaRS(
-            float(config["AGENT"]["lr"]), float(config["AGENT"]["discount"]),
+            float(config["AGENT"]["discount"]), float(config["AGENT"]["lr"]),
             env, params, is_success
         )
 
 
 def is_success(done, info):
-    return done
+    if info is None or info.get("is_success") is None:
+        raise Exception("You need to fix the environment.")
+    if info["is_success"] and done:
+        return True
+    return False
