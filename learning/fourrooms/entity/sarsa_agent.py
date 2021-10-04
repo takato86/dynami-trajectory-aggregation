@@ -7,7 +7,7 @@ from entity.reward_shaping import NaiveSubgoalRewardShaping,\
                             SarsaRewardShaping
 import shaner
 from utils.config import config
-from entity.achiever import TworoomsAchiever
+from entity.achiever import RoomsAchiever
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,7 @@ class SRSSarsaAgent(ShapingSarsaAgent):
             'eta': float(config["SHAPING"]["eta"]),
             'rho': float(config["SHAPING"]["rho"]),
             'params': {
-                'achiever': TworoomsAchiever(
+                'achiever': RoomsAchiever(
                                 float(config["SHAPING"]["_range"]),
                                 nfeatures, subgoals
                             )
@@ -243,7 +243,7 @@ class DTAAgent(ShapingSarsaAgent):
             'vid': config["SHAPING"]["vid"],
             'aggr_id': config["SHAPING"]["aggr_id"],
             'params': {
-                'achiever': TworoomsAchiever(
+                'achiever': RoomsAchiever(
                                 float(config["SHAPING"]["_range"]),
                                 nfeatures, subgoals
                             )

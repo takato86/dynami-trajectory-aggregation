@@ -5,10 +5,12 @@ import pandas as pd
 import gym_fourrooms
 import logging
 import os
+import shutil
 import json
 import time
 import argparse
 from tqdm import tqdm
+from src.agents.factory import create_agent
 from utils.config import config
 from entity.sarsa_agent import SubgoalRSSarsaAgent, SarsaAgent,\
                                NaiveSubgoalSarsaAgent,\
@@ -51,10 +53,10 @@ def load_subgoals(file_path, task_id=None):
 
 
 def learning_loop(env, agent, nruns, nepisodes, nsteps,
-                  id, env_id, learn_id, nprocess):
+                  id, env_id, nprocess):
     runtimes = []
     args = [
-        [run, env, agent, nepisodes, nsteps, id, env_id, learn_id]
+        [run, env, agent, nepisodes, nsteps, id, env_id]
         for run in range(nruns)
     ]
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
@@ -71,14 +73,14 @@ def learning_loop(env, agent, nruns, nepisodes, nsteps,
     export_runtimes(
         os.path.join(
             runtimes_dir,
-            f"{env_id}-{learn_id}-{id}.csv"
+            f"{env_id}-{id}.csv"
         ),
         runtimes
     )
 
 
 def run_loop(args):
-    run, env, agent, nepisodes, nsteps, id, env_id, learn_id = args
+    run, env, agent, nepisodes, nsteps, id, env_id = args
     start_time = time.time()
     agent.reset()
     steps = []
@@ -106,7 +108,8 @@ def run_loop(args):
             if done:
                 break
         steps.append(step)
-        logger.debug('Run {} episode {} steps {}, cumreward {:.4f}, min_Q: {:.4f}, max_Q: {:.4f}'.format(
+        logger.debug(
+            'Run {} episode {} steps {}, cumreward {:.4f}, min_Q: {:.4f}, max_Q: {:.4f}'.format(
                 run, episode, step, cumreward,
                 agent.get_min_value(), agent.get_max_value()
             )
@@ -115,14 +118,14 @@ def run_loop(args):
     export_steps(
         os.path.join(
             steps_dir,
-            f"{env_id}-{learn_id}-{run}-{id}.csv"
+            f"{env_id}-{run}-{id}.csv"
         ),
         steps
     )
     export_details(
         os.path.join(
             detail_dir,
-            f"{env_id}-{learn_id}-{run}-{id}.csv"
+            f"{env_id}-{run}-{id}.csv"
         ),
         details
     )
@@ -132,7 +135,7 @@ def run_loop(args):
 def main():
     logger.info(
         "env: {}, alg: {}".format(
-            config["ENV"]["env_id"], config["SHAPING"]["alg"]
+            config["ENV"]["env_id"], config["AGENT"]["name"]
         )
     )
     env_to_wrap = gym.make(config["ENV"]["env_id"])
@@ -140,7 +143,7 @@ def main():
     if config.getboolean("ENV", "video"):
         movie_folder = prep_dir(
             os.path.join(
-                'out', 'movies', config["SHAPING"]["alg"]
+                out_dir, 'movies'
             )
         )
         env = wrappers.Monitor(
@@ -152,14 +155,11 @@ def main():
     # export_env(
     #   os.path.join(env_dir, f"{config["ENV"]["env_id"]}.csv"), env_to_wrap
     # )
-    nfeatures, nactions = env.observation_space.n, env.action_space.n
     subgoals = [[]]
-    if "subgoal" in config["SHAPING"]["alg"] or\
-       "naive" == config["SHAPING"]["alg"] or\
-       "srs" in config["SHAPING"]["alg"]:
+    if config["SHAPING"].get("subgoal_path") is not None:
         subgoals = load_subgoals(config["SHAPING"]["subgoal_path"], task_id=1)
         logger.info(f"subgoals: {subgoals}")
-    elif "sarsa-rs" in config["SHAPING"]["alg"]:
+    elif config["SHAPING"].get("mapping_path") is not None:
         json_open = open(config["SHAPING"]["mapping_path"])
         aggr_set = [l for _, l in json.load(json_open).items()]
         logger.info(f"mappings: {aggr_set}")
@@ -173,52 +173,53 @@ def main():
     for learn_id, subgoal in enumerate(subgoals):
         logger.info(f"Subgoal {learn_id+1}/{len(subgoals)}: {subgoal}")
         rng = np.random.RandomState(learn_id)
-        if "naive" == config["SHAPING"]["alg"]:
-            logger.info("NaiveSubgoalSarsaAgent")
-            agent = NaiveSubgoalSarsaAgent(
-                float(config["AGENT"]["discount"]),
-                float(config["AGENT"]["epsilon"]),
-                float(config["AGENT"]["lr"]), nfeatures, nactions,
-                float(config["AGENT"]["temperature"]), rng, subgoal,
-                float(config["SHAPING"]["eta"]),
-                float(config["SHAPING"]["rho"]),
-                subgoal_values=None)
-        elif "subgoal" in config["SHAPING"]["alg"]:
-            logger.info("DTAAgent")
-            agent = DTAAgent(
-                float(config["AGENT"]["discount"]),
-                float(config["AGENT"]["epsilon"]),
-                float(config["AGENT"]["lr"]), env,
-                float(config["AGENT"]["temperature"]),
-                rng, subgoal
-            )
-        elif "sarsa-rs" in config["SHAPING"]["alg"]:
-            logger.debug("SarsaRSAgent")
-            agent = SarsaRSSarsaAgent(
-                float(config["AGENT"]["discount"]),
-                float(config["AGENT"]["epsilon"]),
-                float(config["AGENT"]["lr"]), nfeatures, nactions,
-                float(config["AGENT"]["temperature"]), rng, aggr_set)
-        elif "sarsa" in config["SHAPING"]["alg"]:
-            logger.debug("SarsaAgent")
-            agent = SarsaAgent(
-                float(config["AGENT"]["discount"]),
-                float(config["AGENT"]["epsilon"]),
-                float(config["AGENT"]["lr"]), nfeatures, nactions,
-                float(config["AGENT"]["temperature"]), rng)
-        elif "srs" in config["SHAPING"]["alg"]:
-            logger.debug("Subgoal Reward Shaping")
-            agent = SRSSarsaAgent(
-                float(config["AGENT"]["discount"]),
-                float(config["AGENT"]["epsilon"]),
-                float(config["AGENT"]["lr"]), env,
-                float(config["AGENT"]["temperature"]),
-                rng, subgoal
-            )
+        agent = create_agent(config, env, rng, subgoal)
+        # if "naive" == config["SHAPING"]["alg"]:
+        #     logger.info("NaiveSubgoalSarsaAgent")
+        #     agent = NaiveSubgoalSarsaAgent(
+        #         float(config["AGENT"]["discount"]),
+        #         float(config["AGENT"]["epsilon"]),
+        #         float(config["AGENT"]["lr"]), nfeatures, nactions,
+        #         float(config["AGENT"]["temperature"]), rng, subgoal,
+        #         float(config["SHAPING"]["eta"]),
+        #         float(config["SHAPING"]["rho"]),
+        #         subgoal_values=None)
+        # elif "subgoal" in config["SHAPING"]["alg"]:
+        #     logger.info("DTAAgent")
+        #     agent = DTAAgent(
+        #         float(config["AGENT"]["discount"]),
+        #         float(config["AGENT"]["epsilon"]),
+        #         float(config["AGENT"]["lr"]), env,
+        #         float(config["AGENT"]["temperature"]),
+        #         rng, subgoal
+        #     )
+        # elif "sarsa-rs" in config["SHAPING"]["alg"]:
+        #     logger.debug("SarsaRSAgent")
+        #     agent = SarsaRSSarsaAgent(
+        #         float(config["AGENT"]["discount"]),
+        #         float(config["AGENT"]["epsilon"]),
+        #         float(config["AGENT"]["lr"]), nfeatures, nactions,
+        #         float(config["AGENT"]["temperature"]), rng, aggr_set)
+        # elif "sarsa" in config["SHAPING"]["alg"]:
+        #     logger.debug("SarsaAgent")
+        #     agent = SarsaAgent(
+        #         float(config["AGENT"]["discount"]),
+        #         float(config["AGENT"]["epsilon"]),
+        #         float(config["AGENT"]["lr"]), nfeatures, nactions,
+        #         float(config["AGENT"]["temperature"]), rng)
+        # elif "srs" in config["SHAPING"]["alg"]:
+        #     logger.debug("Subgoal Reward Shaping")
+        #     agent = SRSSarsaAgent(
+        #         float(config["AGENT"]["discount"]),
+        #         float(config["AGENT"]["epsilon"]),
+        #         float(config["AGENT"]["lr"]), env,
+        #         float(config["AGENT"]["temperature"]),
+        #         rng, subgoal
+        #     )
         learning_loop(
             env, agent, int(config["AGENT"]["nruns"]),
             int(config["AGENT"]["nepisodes"]),
-            int(config["AGENT"]["nsteps"]), config["SHAPING"]["alg"],
+            int(config["AGENT"]["nsteps"]),
             config["ENV"]["env_id"], learn_id,
             int(config["ENV"]["nprocess"])
         )
@@ -232,7 +233,12 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     config.read(args.config)
-    out_dir = prep_dir(os.path.join("out", config["SHAPING"]["alg"]))
+    config_fname = os.path.basename(args.config)
+    out_dir = prep_dir(config["SETTING"]["out_dir"])
+    shutil.copy(
+        args.config,
+        os.path.join(out_dir, config_fname)
+    )
     steps_dir = prep_dir(os.path.join(out_dir, "steps"))
     runtimes_dir = prep_dir(os.path.join(out_dir, "runtime"))
     detail_dir = prep_dir(os.path.join(out_dir, "detail"))
