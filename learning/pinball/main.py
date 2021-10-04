@@ -1,23 +1,17 @@
 import argparse
 import time
 import gym
-from datetime import datetime
 import os
+import shutil
+import json
 import logging
-from gym import wrappers, logger
+from gym import wrappers
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import itertools
-
-from entity.ac_agent import SubgoalACAgent, \
-                            ActorCriticAgent, \
-                            NaiveSubgoalACAgent, \
-                            SarsaRSACAgent,\
-                            SRSACAgent
-from entity.mapping import Mapper
 import gym_pinball
-from tqdm import tqdm, trange
+from tqdm import tqdm
+from src.agents.factory import create_agent
 from visualizer import Visualizer
 from concurrent.futures import ProcessPoolExecutor
 
@@ -81,7 +75,7 @@ def load_subgoals_new(file_path):
     subg_serieses = []
     for x, y, rad in zip(xs, ys, rads):
         subg_series = []
-        for x_i, y_i, rad_i in zip(x, y, rad):
+        for x_i, y_i, _ in zip(x, y, rad):
             subg_series.append(
                 np.array([
                     x_i, y_i, np.nan, np.nan
@@ -107,73 +101,30 @@ def get_file_names(exe_id, l_id, run, eta=None, rho=None, k=None):
 
 
 def learning_loop(args):
-    run, env_id, episode_count, model, visual, exe_id, rho, eta, subgoals, l_id, k = args
+    run, config, subgoals, l_id = args
     logger.debug(f"start run {run}")
     subg_confs = list(itertools.chain.from_iterable(subgoals))
-    env = gym.make(env_id, subg_confs=subg_confs)
-    outdir = '/tmp/random-agent-results'
-    env = wrappers.Monitor(env, directory=outdir, force=True)
-    env.seed(0)
-    if "subgoal" == exe_id:
-        logger.debug("Subgoal AC Agent")
-        agent = SubgoalACAgent(run, env.action_space, env.observation_space, rho=rho, eta=eta, subgoals=subgoals)
-        fnames = get_file_names(exe_id, l_id, run)
-    elif "actor-critic" == exe_id:
-        logger.debug("Actor-Critic Agent")
-        agent = ActorCriticAgent(run, env.action_space, env.observation_space)
-        fnames = get_file_names(exe_id, l_id, run)
-    elif "naive" == exe_id:
-        logger.debug("Naive Subgoal AC Agent")
-        agent = NaiveSubgoalACAgent(run, env.action_space, env.observation_space, rho=rho, eta=eta, subgoals=subgoals)
-        fnames = get_file_names(exe_id, l_id, run, eta, rho)
-    elif "sarsa-rs" in exe_id:
-        logger.debug("Sarsa RS AC Agent")
-        params = {
-            "vid": "table",
-            "aggr_id": "ndisc",
-            "params": {
-                "env": env,
-                "n": k
-            }
-        }
-        agent = SarsaRSACAgent(
-            run, env.action_space, env.observation_space, env, params
-        )
-        fnames = get_file_names(exe_id, l_id, run, k=k)
-    elif "srs" in exe_id:
-        logger.debug("Subgoal-based Reward Shaping AC Agent")
-        params = {
-            "vid": "table",
-            "aggr_id": "dta",
-            "eta": eta,
-            "rho": rho,
-            "params":{
-                "env_id": env.spec.id,
-                "_range": 0.04,
-                "n_obs": env.observation_space.shape[0],
-                "subgoals": subgoals
-            }
-        }
-        agent = SRSACAgent(
-            run, env, params
-        )
-        fnames = get_file_names(exe_id, l_id, run, eta, rho)
-    else:
-        raise NotImplemented
+    env = gym.make(config["env"]["id"], subg_confs=subg_confs)
+    env = wrappers.Monitor(env, directory=d_kinds["mv"], force=True)
+    env.seed(config["setting"]["seed"])
+    agent = create_agent(config, env, subgoals)
+    fnames = get_file_names(config["agent"]["name"], l_id, run)
 
     vis = Visualizer(["ACC_X", "ACC_Y", "DEC_X", "DEC_Y", "NONE"])
-    if model:
-        agent.load_model(model)
+
+    if config["env"]["model"]:
+        agent.load_model(config["env"]["model"])
+
+    episode_count = config["setting"]["nepisodes"]
+    visual = config["setting"]["visual"]
     reward = 0
-    done = False
-    total_reward_list = []
-    steps_list = []
-    max_q_list = []
-    max_q_episode_list = []
-    runtimes = []
     max_q = 0.0
+    done = False
+    total_reward_list, steps_list, max_q_list = [], [], []
+    max_q_episode_list, runtimes = [], []
     start_time = time.time()
-    for i in range(episode_count):
+
+    for episode in range(episode_count):
         total_reward = 0
         total_shaped_reward = 0
         n_steps = 0
@@ -182,35 +133,44 @@ def learning_loop(args):
         pre_action = action
         is_render = False
         while True:
-            if (i+1) % 20 == 0 and visual:
+            if (episode+1) % 20 == 0 and visual:
                 env.render()
                 is_render = True
             pre_obs = ob
-            ob, reward, done, _ = env.step(action)
+            ob, reward, done, info = env.step(action)
             # TODO
             reward = 0 if reward < 0 else reward
             n_steps += 1
             # rand_basis = np.random.uniform()
             pre_action = action
             action = agent.act(ob)
-            shaped_reward = agent.update(pre_obs, pre_action, reward, ob, action, done)
+            shaped_reward = agent.update(
+                pre_obs, pre_action, reward, ob, action, done, info
+            )
             total_reward += reward
             total_shaped_reward += shaped_reward
             tmp_max_q = agent.get_max_q(ob)
             max_q_list.append(tmp_max_q)
             max_q = tmp_max_q if tmp_max_q > max_q else max_q
+
             if done:
-                logger.debug("episode: {}, steps: {}, total_reward: {}, total_shaped_reward: {}, max_q: {}, max_td_error: {}"
-                        .format(i, n_steps, total_reward, int(total_shaped_reward), int(max_q), int(agent.get_max_td_error())))
+                logger.debug(
+                    "episode: {}, steps: {}, total_reward: {}, "
+                    "total_shaped_reward: {}, max_q: {}, "
+                    "max_td_error: {}".format(
+                        episode, n_steps, total_reward,
+                        int(total_shaped_reward), int(max_q), int(agent.get_max_td_error())
+                    )
+                )
                 total_reward_list.append(total_reward)
                 steps_list.append(n_steps)
                 break
-            
+
             if is_render:
                 vis.set_action_dist(agent.vis_action_dist, action)
                 vis.pause(.0001)
         max_q_episode_list.append(max_q)
-        agent.save_model(d_kinds["mo"], i)
+        agent.save_model(d_kinds["mo"], episode)
     # export process
     runtimes.append(time.time() - start_time)
     export_csv(
@@ -218,11 +178,11 @@ def learning_loop(args):
         fnames['total_reward'],
         total_reward_list
     )
-    td_error_list = agent.td_error_list
+    summary = agent.summary()
     export_csv(
         d_kinds["td"],
         fnames['td_error'],
-        td_error_list
+        summary["td_errors"]
     )
     total_reward_list = np.array(total_reward_list)
     steps_list = np.array(steps_list)
@@ -231,64 +191,68 @@ def learning_loop(args):
     steps_file_path = os.path.join(d_kinds["st"], fnames['steps'])
     pd.DataFrame(steps_list).to_csv(steps_file_path)
     runtime_file_path = os.path.join(d_kinds["ru"], fnames['runtime'])
-    runtimes_df = pd.DataFrame(runtimes, columns=["runtime"]).to_csv(runtime_file_path)
+    pd.DataFrame(runtimes, columns=["runtime"]).to_csv(runtime_file_path)
     env.close()
 
 
 def main():
-    logger.info("ENV: {}".format(args.env_id))
+    logger.info("ENV: {}".format(config["env"]["id"]))
     learning_time = time.time()
-    if "srs" in args.id:
-        subg_serieses = load_subgoals_new(args.subg_path)
-    elif len(args.subg_path) == 0:
+    if config["shaping"].get("subg_path") is not None:
+        subg_serieses = load_subgoals_new(config["shaping"]["subg_path"])
+    else:
         logger.debug("Nothing subgoal path.")
         subg_serieses = [[[{"pos_x": 0.512, "pos_y": 0.682, "rad": 0.04}, {"pos_x": 0.683, "pos_y": 0.296, "rad": 0.04}]]] # , {"pos_x":0.9 , "pos_y":0.2 ,"rad": 0.04}
-    else:
-        subg_serieses = load_subgoals(args.subg_path)
-    
+
     for l_id, subg_series in enumerate(subg_serieses):
         logger.debug(f"learning: {l_id+1}/{len(subg_serieses)}")
         logger.debug(f"subgoals: {subg_series}")
         arguments = [
             [
-                run, args.env_id, args.nepisodes, args.model,
-                args.vis, args.id, args.rho, args.eta, subg_series, l_id, args.k
+                run, config, subg_series, l_id
             ]
-            for run in range(args.nruns)
+            for run in range(config["setting"]["nruns"])
         ]
-        with ProcessPoolExecutor() as executor:
-            tqdm(executor.map(learning_loop, arguments), total=args.nruns)
+        # with ProcessPoolExecutor(max_workers=config["setting"]["nprocesses"]) as executor:
+        #     tqdm(
+        #         executor.map(learning_loop, arguments),
+        #         total=config["setting"]["nruns"]
+        #     )
 
         # Single Process
-        # for run in range(args.nruns):
-        #     logger.debug(f"Run: {run+1}/{args.nruns}")
-        #     learning_loop(arguments[run])
+        for run in tqdm(range(config["setting"]["nruns"])):
+            logger.debug(
+                "Run: {}/{}".format(
+                    run+1, config["setting"]["nruns"]
+                )
+            )
+            learning_loop(arguments[run])
         #     # Close the env and write monitor result info to disk
     duration = time.time() - learning_time
-    logger.info("Learning time: {}m {}s".format(int(duration//60), int(duration%60)))
+    logger.info("Learning time: {}m {}s".format(
+        int(duration//60), int(duration % 60)
+    ))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Actor-Critic Learning.')
-    parser.add_argument('env_id', nargs='?', default='Pinball-Subgoal-v0', help='Select the environment to run.')
-    parser.add_argument('--vis', action='store_true', help='Attach when you want to look visual results.')
-    parser.add_argument('--model', help='Input model dir path')
-    parser.add_argument('--nepisodes', default=250, type=int)
-    parser.add_argument('--nruns', default=25, type=int)
-    parser.add_argument('--id')  # , choices=ALG_CHOICES
-    parser.add_argument('--subg-path', default='', type=str)
-    parser.add_argument('--eta', default=10000, type=float)
-    parser.add_argument('--rho', default=0.01, type=float)
-    parser.add_argument('--k', type=int, help='How many to discretize the observation related to space.')
-
+    parser.add_argument('--config', type=str)
     args = parser.parse_args()
-    saved_dir = os.path.join("out", args.id)
+
+    with open(args.config, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    config_fname = os.path.basename(args.config)
+    saved_dir = config["setting"]["out_dir"]
+    shutil.copy(args.config, os.path.join(saved_dir, config_fname))
+
     d_kinds = {
         "tr": os.path.join(saved_dir, "total_reward"),
         "st": os.path.join(saved_dir, "steps"),
         "td": os.path.join(saved_dir, "td_error"),
         "mo": os.path.join(saved_dir, "model"),
-        "ru": os.path.join(saved_dir, "runtime")
+        "ru": os.path.join(saved_dir, "runtime"),
+        "mv": os.path.join(saved_dir, "movie")
     }
     for fpath in d_kinds.values():
         if not os.path.exists(fpath):

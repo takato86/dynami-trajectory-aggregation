@@ -1,3 +1,4 @@
+"""!!!Deprecated Module!!!"""
 import numpy as np
 import os
 import logging
@@ -223,7 +224,7 @@ class SRSACAgent(ActorCriticAgent):
     def __init__(self, seed, env, params, basis_order=3,
                  epsilon=0.01, gamma=0.99, gamma_v=0.99, lr_theta=0.01,
                  lr_q=0.01, lr_v=0.01):
-        action_space= env.action_space
+        action_space = env.action_space
         observation_space = env.observation_space 
         super().__init__(seed, action_space, observation_space, basis_order, epsilon, gamma, lr_theta, lr_q)
         self.reward_shaping = SubgoalRS(gamma, lr_v, env, params)
