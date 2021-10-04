@@ -12,10 +12,6 @@ import argparse
 from tqdm import tqdm
 from src.agents.factory import create_agent
 from utils.config import config
-from entity.sarsa_agent import SubgoalRSSarsaAgent, SarsaAgent,\
-                               NaiveSubgoalSarsaAgent,\
-                               SarsaRSSarsaAgent, SRSSarsaAgent,\
-                               DTAAgent
 from concurrent.futures import ProcessPoolExecutor
 
 
@@ -109,7 +105,8 @@ def run_loop(args):
                 break
         steps.append(step)
         logger.debug(
-            'Run {} episode {} steps {}, cumreward {:.4f}, min_Q: {:.4f}, max_Q: {:.4f}'.format(
+            'Run {} episode {} steps {}, cumreward {:.4f}, min_Q: {:.4f},'
+            ' max_Q: {:.4f}'.format(
                 run, episode, step, cumreward,
                 agent.get_min_value(), agent.get_max_value()
             )
