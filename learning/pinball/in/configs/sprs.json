@@ -2,18 +2,18 @@
     "setting": {
         "visual": false,
         "seed": 0,
-        "out_dir": "out/actor_critic",
+        "out_dir": "out/sprs_human",
         "nepisodes": 250,
         "nruns": 25,
-        "parallel": false,
-        "nprocesses": 1
+        "parallel": true,
+        "nprocesses": 10
     },
     "env": {
         "id": "Pinball-Subgoal-v0",
         "model": null
     },
     "agent": {
-        "name": "DTAAgent",
+        "name": "SPRSAgent",
         "raw_agent": "ActorCriticAgent",
         "basis_order": 3,
         "epsilon": 0.01,
@@ -22,12 +22,7 @@
         "lr_q": 0.001
     },
     "shaping":{
-        "vid": "table",
-        "aggr_id": "dta",
         "range": 0.04,
-        "subg_path": "in/subgoals/human_subgoals.csv",
-        "eta": 10000,
-        "rho": 0.01,
-        "k": 3
+        "subg_path": "in/subgoals/human_subgoals.csv"
     }
 }

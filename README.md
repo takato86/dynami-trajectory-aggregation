@@ -16,7 +16,7 @@ pip install -e .
 
     ```
     cd learning/fourrooms
-    bash run.sh
+    python main.py --config=<config file path>
     ```
 
     You can switch the algorithm if you uncomment the other line in `run.sh`.
@@ -25,7 +25,7 @@ pip install -e .
 
     ```
     cd learning/pinball
-    bash run.sh
+    python main.py --config=<config file path>
     ```
 
     You can switch the algorithm if you uncomment the other line in `run.sh`.

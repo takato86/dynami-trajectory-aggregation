@@ -11,7 +11,7 @@ import time
 import argparse
 from tqdm import tqdm
 from src.agents.factory import create_agent
-from utils.config import config
+from src.config import config
 from concurrent.futures import ProcessPoolExecutor
 
 
@@ -181,15 +181,6 @@ def main():
         #         float(config["SHAPING"]["eta"]),
         #         float(config["SHAPING"]["rho"]),
         #         subgoal_values=None)
-        # elif "subgoal" in config["SHAPING"]["alg"]:
-        #     logger.info("DTAAgent")
-        #     agent = DTAAgent(
-        #         float(config["AGENT"]["discount"]),
-        #         float(config["AGENT"]["epsilon"]),
-        #         float(config["AGENT"]["lr"]), env,
-        #         float(config["AGENT"]["temperature"]),
-        #         rng, subgoal
-        #     )
         # elif "sarsa-rs" in config["SHAPING"]["alg"]:
         #     logger.debug("SarsaRSAgent")
         #     agent = SarsaRSSarsaAgent(
@@ -197,22 +188,7 @@ def main():
         #         float(config["AGENT"]["epsilon"]),
         #         float(config["AGENT"]["lr"]), nfeatures, nactions,
         #         float(config["AGENT"]["temperature"]), rng, aggr_set)
-        # elif "sarsa" in config["SHAPING"]["alg"]:
-        #     logger.debug("SarsaAgent")
-        #     agent = SarsaAgent(
-        #         float(config["AGENT"]["discount"]),
-        #         float(config["AGENT"]["epsilon"]),
-        #         float(config["AGENT"]["lr"]), nfeatures, nactions,
-        #         float(config["AGENT"]["temperature"]), rng)
-        # elif "srs" in config["SHAPING"]["alg"]:
-        #     logger.debug("Subgoal Reward Shaping")
-        #     agent = SRSSarsaAgent(
-        #         float(config["AGENT"]["discount"]),
-        #         float(config["AGENT"]["epsilon"]),
-        #         float(config["AGENT"]["lr"]), env,
-        #         float(config["AGENT"]["temperature"]),
-        #         rng, subgoal
-        #     )
+
         learning_loop(
             env, agent, int(config["AGENT"]["nruns"]),
             int(config["AGENT"]["nepisodes"]),

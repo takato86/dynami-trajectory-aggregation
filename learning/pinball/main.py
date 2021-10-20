@@ -213,21 +213,24 @@ def main():
             ]
             for run in range(config["setting"]["nruns"])
         ]
-        # with ProcessPoolExecutor(max_workers=config["setting"]["nprocesses"]) as executor:
-        #     tqdm(
-        #         executor.map(learning_loop, arguments),
-        #         total=config["setting"]["nruns"]
-        #     )
 
-        # Single Process
-        for run in tqdm(range(config["setting"]["nruns"])):
-            logger.debug(
-                "Run: {}/{}".format(
-                    run+1, config["setting"]["nruns"]
+        if config["setting"]["parallel"]:
+            with ProcessPoolExecutor(max_workers=config["setting"]["nprocesses"]) as executor:
+                tqdm(
+                    executor.map(learning_loop, arguments),
+                    total=config["setting"]["nruns"]
                 )
-            )
-            learning_loop(arguments[run])
+        else:
+            # Single Process
+            for run in tqdm(range(config["setting"]["nruns"])):
+                logger.debug(
+                    "Run: {}/{}".format(
+                        run+1, config["setting"]["nruns"]
+                    )
+                )
+                learning_loop(arguments[run])
         #     # Close the env and write monitor result info to disk
+
     duration = time.time() - learning_time
     logger.info("Learning time: {}m {}s".format(
         int(duration//60), int(duration % 60)
@@ -244,8 +247,6 @@ if __name__ == '__main__':
 
     config_fname = os.path.basename(args.config)
     saved_dir = config["setting"]["out_dir"]
-    shutil.copy(args.config, os.path.join(saved_dir, config_fname))
-
     d_kinds = {
         "tr": os.path.join(saved_dir, "total_reward"),
         "st": os.path.join(saved_dir, "steps"),
@@ -254,7 +255,10 @@ if __name__ == '__main__':
         "ru": os.path.join(saved_dir, "runtime"),
         "mv": os.path.join(saved_dir, "movie")
     }
+
     for fpath in d_kinds.values():
         if not os.path.exists(fpath):
             os.makedirs(fpath)
+
+    shutil.copy(args.config, os.path.join(saved_dir, config_fname))
     main()

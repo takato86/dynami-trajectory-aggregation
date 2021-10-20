@@ -25,6 +25,7 @@ class SPRSAgent(ShapedAgent):
         )
 
     def info(self, state):
+        # TODO potentialの取得をp_potentialの値に
         raw_agent_info = self.raw_agent.info(state)
         info = {
             "potential": self.reward_shaping.potential(state)

@@ -10,7 +10,7 @@ class BasePolicy:
         # 分析用
         self.exploit_count = 0
         self.explore_count = 0
-    
+
     def reset_count(self):
         self.exploit_count = 0
         self.explore_count = 0
@@ -34,7 +34,7 @@ class EgreedyPolicy(BasePolicy):
             return int(self.rng.randint(self.weights.shape[1]))
         self.exploit_count += 1
         return int(np.argmax(self.value(phi)))
-    
+
     def get_values(self, env):
         state_values = np.zeros(env.occupancy.shape)
         for state in range(len(self.weights)):
@@ -42,7 +42,7 @@ class EgreedyPolicy(BasePolicy):
             cell = env.to_cell(state)
             state_values[cell[0]][cell[1]] = value
         return state_values
-    
+
     def get_policy(self, env):
         policy = np.zeros(env.occupancy.shape)
         for state in range(len(self.weights)):
@@ -103,7 +103,7 @@ class SoftmaxPolicy(BasePolicy):
 class SoftmaxStepPolicy(SoftmaxPolicy):
     def __init__(self, rng, nfeatures, nactions, action_policy, temp=1.):
         super(SoftmaxStepPolicy, self).__init__(rng, nfeatures, nactions, temp)
-        
+
     def sample(self, phi):
         return np.argmax(-self.weights.shape[1])
 
@@ -112,7 +112,7 @@ class PolicyOverOptions:
     def __init__(self, policy, initiation_sets):
         self.policy = policy
         self.initiation_sets = initiation_sets
-    
+
     def value(self, phi, action=None):
         return self.policy.value(phi, action)
 

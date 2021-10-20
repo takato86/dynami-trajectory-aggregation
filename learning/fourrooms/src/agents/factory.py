@@ -1,4 +1,3 @@
-from numpy.core.fromnumeric import shape
 from src.agents.sarsa import SarsaAgent
 from src.agents.dta import DTAAgent
 from src.agents.srs import SRSAgent

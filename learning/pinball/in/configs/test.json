@@ -5,6 +5,7 @@
         "out_dir": "out/test",
         "nepisodes": 1,
         "nruns": 1,
+        "parallel": false,
         "nprocesses": 1
     },
     "env": {
