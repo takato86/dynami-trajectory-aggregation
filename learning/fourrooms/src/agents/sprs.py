@@ -14,21 +14,25 @@ class SPRSAgent(ShapedAgent):
 
     def _generate_shaping(self, env, subgoals):
         nfeatures = env.observation_space.n
-        value_func = self.raw_agent.get_value
         return shaner.SubgoalPulseRS(
             float(self.config["AGENT"]["discount"]),
-            value_func,
             RoomsAchiever(
                 float(self.config["SHAPING"]["_range"]),
                 nfeatures, subgoals
             )
         )
 
+    def update(self, state, action, next_state, reward, done, info):
+        next_state_value = self.raw_agent.get_value(next_state)
+        # 価値関数のセット
+        self.reward_shaping.set_value(next_state_value)
+        super().update(state, action, next_state, reward, done, info)
+
     def info(self, state):
         # TODO potentialの取得をp_potentialの値に
         raw_agent_info = self.raw_agent.info(state)
         info = {
-            "potential": self.reward_shaping.potential(state)
+            "potential": self.reward_shaping.p_potential
         }
         joined_info = {**raw_agent_info, **info}
         return joined_info

@@ -82,11 +82,11 @@ def run_loop(args):
     steps = []
     runtimes = []
     details = {}
-    for episode in range(nepisodes):
+    for episode in tqdm(range(nepisodes), leave=False):
         next_observation = env.reset()
         logger.debug(f"start: {next_observation}, goal: {env.goal}")
         cumreward = 0
-        for step in range(nsteps):
+        for step in tqdm(range(nsteps), leave=False):
             observation = next_observation
             action = agent.act(observation)
             next_observation, reward, done, info = env.step(action)
@@ -94,7 +94,7 @@ def run_loop(args):
             agent.update(
                 observation, action, next_observation, reward, done, info
             )
-            detail = agent.info(observation)
+            detail = agent.info(next_observation)
             if detail:
                 ind = episode * nepisodes + step
                 detail["episode"] = episode
@@ -161,11 +161,7 @@ def main():
         aggr_set = [l for _, l in json.load(json_open).items()]
         logger.info(f"mappings: {aggr_set}")
 
-    logger.info(
-        "Start learning in the case of eta={}, rho={}".format(
-            config["SHAPING"]["eta"], config["SHAPING"]["rho"]
-        )
-    )
+    logger.info("Start learning")
 
     for learn_id, subgoal in enumerate(subgoals):
         logger.info(f"Subgoal {learn_id+1}/{len(subgoals)}: {subgoal}")

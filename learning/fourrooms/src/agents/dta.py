@@ -12,8 +12,8 @@ class DTAAgent(ShapedAgent):
     def _generate_shaping(self, env, subgoals):
         nfeatures = env.observation_space.n
         return shaner.SarsaRS(
-            float(self.config["AGENT"]["lr"]),
             float(self.config["AGENT"]["discount"]),
+            float(self.config["AGENT"]["lr"]),
             env, self.config["SHAPING"]["aggr_id"],
             RoomsAchiever(
                 float(self.config["SHAPING"]["_range"]),
@@ -22,6 +22,14 @@ class DTAAgent(ShapedAgent):
             self.config["SHAPING"]["vid"],
             is_success
         )
+
+    def info(self, state):
+        super_info = super().info(state)
+        info = {
+            "z": self.reward_shaping.get_current_state()
+        }
+        joined_info = {**super_info, **info}
+        return joined_info
 
 
 def is_success(done, info):

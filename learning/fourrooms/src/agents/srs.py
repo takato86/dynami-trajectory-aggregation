@@ -15,8 +15,8 @@ class SRSAgent(ShapedAgent):
     def _generate_shaping(self, env, subgoals):
         nfeatures = env.observation_space.n
         return shaner.SubgoalRS(
-            float(self.config["AGENT"]["lr"]),
             float(self.config["AGENT"]["discount"]),
+            float(self.config["AGENT"]["lr"]),
             float(self.config["SHAPING"]["eta"]),
             float(self.config["SHAPING"]["rho"]),
             self.config["SHAPING"]["aggr_id"],
