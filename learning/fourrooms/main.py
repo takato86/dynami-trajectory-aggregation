@@ -1,3 +1,4 @@
+from datetime import datetime
 import gym
 from gym import wrappers
 import numpy as np
@@ -14,6 +15,8 @@ from src.agents.factory import create_agent
 from src.config import config
 from concurrent.futures import ProcessPoolExecutor
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def export_steps(file_path, steps):
     with open(file_path, 'w') as f:
@@ -48,13 +51,16 @@ def load_subgoals(file_path, task_id=None):
     return subg_serieses
 
 
-def learning_loop(env, agent, nruns, nepisodes, nsteps,
+def learning_loop(env, subgoal, nruns, nepisodes, nsteps,
                   id, env_id, nprocess):
     runtimes = []
-    args = [
-        [run, env, agent, nepisodes, nsteps, id, env_id]
-        for run in range(nruns)
-    ]
+    args = []
+    for run in range(nruns):
+        rng = np.random.RandomState((id + 1) * (run + 1))
+        agent = create_agent(config, env, rng, subgoal)
+        args.append(
+            [run, env, agent, nepisodes, nsteps, id, env_id]
+        )
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
         ret = tqdm(executor.map(run_loop, args), total=nruns)
     runtimes = list(ret)
@@ -86,7 +92,7 @@ def run_loop(args):
         next_observation = env.reset()
         logger.debug(f"start: {next_observation}, goal: {env.goal}")
         cumreward = 0
-        for step in tqdm(range(nsteps), leave=False):
+        for step in range(nsteps):
             observation = next_observation
             action = agent.act(observation)
             next_observation, reward, done, info = env.step(action)
@@ -99,6 +105,7 @@ def run_loop(args):
                 ind = episode * nepisodes + step
                 detail["episode"] = episode
                 detail["step"] = step
+                detail["reward"] = reward
                 details[ind] = detail
             cumreward += reward
             if done:
@@ -136,7 +143,7 @@ def main():
         )
     )
     env_to_wrap = gym.make(config["ENV"]["env_id"])
-    # env_to_wrap.env.init_states = [0]
+
     if config.getboolean("ENV", "video"):
         movie_folder = prep_dir(
             os.path.join(
@@ -149,14 +156,14 @@ def main():
     else:
         env = env_to_wrap
 
-    # export_env(
-    #   os.path.join(env_dir, f"{config["ENV"]["env_id"]}.csv"), env_to_wrap
-    # )
     subgoals = [[]]
-    if config["SHAPING"].get("subgoal_path") is not None:
+
+    if "SHAPING" not in config.sections():
+        pass
+    elif config.get("SHAPING", "subgoal_path") is not None:
         subgoals = load_subgoals(config["SHAPING"]["subgoal_path"], task_id=1)
         logger.info(f"subgoals: {subgoals}")
-    elif config["SHAPING"].get("mapping_path") is not None:
+    elif config.get("SHAPING", "mapping_path") is not None:
         json_open = open(config["SHAPING"]["mapping_path"])
         aggr_set = [l for _, l in json.load(json_open).items()]
         logger.info(f"mappings: {aggr_set}")
@@ -165,18 +172,6 @@ def main():
 
     for learn_id, subgoal in enumerate(subgoals):
         logger.info(f"Subgoal {learn_id+1}/{len(subgoals)}: {subgoal}")
-        rng = np.random.RandomState(learn_id)
-        agent = create_agent(config, env, rng, subgoal)
-        # if "naive" == config["SHAPING"]["alg"]:
-        #     logger.info("NaiveSubgoalSarsaAgent")
-        #     agent = NaiveSubgoalSarsaAgent(
-        #         float(config["AGENT"]["discount"]),
-        #         float(config["AGENT"]["epsilon"]),
-        #         float(config["AGENT"]["lr"]), nfeatures, nactions,
-        #         float(config["AGENT"]["temperature"]), rng, subgoal,
-        #         float(config["SHAPING"]["eta"]),
-        #         float(config["SHAPING"]["rho"]),
-        #         subgoal_values=None)
         # elif "sarsa-rs" in config["SHAPING"]["alg"]:
         #     logger.debug("SarsaRSAgent")
         #     agent = SarsaRSSarsaAgent(
@@ -186,10 +181,12 @@ def main():
         #         float(config["AGENT"]["temperature"]), rng, aggr_set)
 
         learning_loop(
-            env, agent, int(config["AGENT"]["nruns"]),
+            env, subgoal,
+            int(config["AGENT"]["nruns"]),
             int(config["AGENT"]["nepisodes"]),
             int(config["AGENT"]["nsteps"]),
-            config["ENV"]["env_id"], learn_id,
+            learn_id,
+            config["ENV"]["env_id"],
             int(config["ENV"]["nprocess"])
         )
     env.close()
@@ -199,11 +196,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
     config.read(args.config)
     config_fname = os.path.basename(args.config)
-    out_dir = prep_dir(config["SETTING"]["out_dir"])
+    now = datetime.now()
+    out_dir = prep_dir(
+        config["SETTING"]["out_dir"] + "_" + datetime.strftime(now,
+                                                               "%Y%m%d_%H%M")
+    )
     shutil.copy(
         args.config,
         os.path.join(out_dir, config_fname)

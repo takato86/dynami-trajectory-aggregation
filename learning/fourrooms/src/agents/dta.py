@@ -32,5 +32,26 @@ class DTAAgent(ShapedAgent):
         return joined_info
 
 
+class OffsetDTAAgent(DTAAgent):
+    def __init__(self, raw_agent, env, subgoals, config):
+        super().__init__(
+            raw_agent, env, subgoals, config
+        )
+
+    def _generate_shaping(self, env, subgoals):
+        nfeatures = env.observation_space.n
+        return shaner.OffsetSarsaRS(
+            float(self.config["AGENT"]["discount"]),
+            float(self.config["AGENT"]["lr"]),
+            env, self.config["SHAPING"]["aggr_id"],
+            RoomsAchiever(
+                float(self.config["SHAPING"]["_range"]),
+                nfeatures, subgoals
+            ),
+            self.config["SHAPING"]["vid"],
+            is_success
+        )
+
+
 def is_success(done, info):
     return done

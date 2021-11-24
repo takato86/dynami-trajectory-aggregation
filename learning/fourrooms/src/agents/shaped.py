@@ -10,6 +10,7 @@ class ShapedAgent:
         self.raw_agent = raw_agent
         self.config = config
         self.reward_shaping = self._generate_shaping(env, subgoals)
+        self.current_shaping = 0
 
     def _generate_shaping(self, env, subgoals):
         raise NotImplementedError
@@ -23,6 +24,7 @@ class ShapedAgent:
         self.raw_agent.update(
             state, action, next_state, reward + F, done, info
         )
+        self.current_shaping = F
 
     def act(self, state):
         return self.raw_agent.act(state)
@@ -42,7 +44,8 @@ class ShapedAgent:
         info = {
             "v_z": self.reward_shaping.potential(
                         self.reward_shaping.aggregater.current_state
-                   )
+                   ),
+            "F": self.current_shaping
         }
         joined_info = {**raw_agent_info, **info}
         return joined_info
