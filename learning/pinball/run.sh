@@ -1,7 +1,7 @@
 for ETA in 100
 do
-echo "human-srs-eta=${ETA}"
-python main.py --id="human-srs-eta=${ETA}" --nruns=100 --nepisodes=200 --subg-path="in/subgoals/human_subgoals.csv" --eta=$ETA --rho=0
+echo "test-human-srs-eta=${ETA}"
+python main.py --id="test-human-srs-eta=${ETA}" --nruns=100 --nepisodes=200 --subg-path="in/subgoals/human_subgoals.csv" --eta=$ETA --rho=0
 echo "random-srs-eta=${ETA}"
 python main.py --id="random-srs-eta=${ETA}" --nruns=100 --nepisodes=200 --subg-path="in/subgoals/random_subgoals.csv" --eta=$ETA --rho=0
 done

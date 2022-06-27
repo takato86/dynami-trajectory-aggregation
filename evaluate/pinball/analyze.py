@@ -140,8 +140,7 @@ def main():
         t2thres_500[argv] = get_time_to_threshold(argv, 500)
         t2thres_2000[argv] = get_time_to_threshold(argv, 2000)
         t2thres_1000[argv] = get_time_to_threshold(argv, 1000)
-        
-        asym_perf[argv] = get_asymptotic_performance(argv, 10 ,200)
+        asym_perf[argv] = get_asymptotic_performance(argv, 10, 200)
     out_dir = 'out'
     file_name = 'mean_ste_total_reward.csv'
     file_path = os.path.join(out_dir, file_name)
@@ -153,6 +152,7 @@ def main():
     export(os.path.join(out_dir, "time_to_threshold_2000.csv"), t2thres_2000)
     export(os.path.join(out_dir, "time_to_threshold_1000.csv"), t2thres_1000)
     export(os.path.join(out_dir, "asymptotic_performance.csv"), asym_perf)
+
 
 if __name__ == "__main__":
     main()
