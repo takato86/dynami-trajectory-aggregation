@@ -1,3 +1,4 @@
+from datetime import datetime
 import gym
 from gym import wrappers
 import numpy as np
@@ -44,6 +45,11 @@ def export_runtimes(file_path, runtimes):
     runtimes_df.to_csv(file_path)
 
 
+def export_arguments(file_path, arguments):
+    with open(file_path, mode="w", encoding="utf-8") as f:
+        json.dump(vars(arguments), f)
+
+
 def prep_dir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
@@ -82,6 +88,7 @@ def learning_loop(env, agent, nruns, nepisodes, nsteps,
 
 
 def run_loop(args):
+    """The multiprocessed method."""
     run, env, agent, nepisodes, nsteps, id, env_id, learn_id = args
     start_time = time.time()
     agent.reset()
@@ -114,6 +121,7 @@ def run_loop(args):
 
 
 def main():
+    logger.info(f"Start learning")
     logger.info("env: {}, alg: {}".format(args.env_id, args.id))
     env_to_wrap = gym.make(args.env_id)
     # env_to_wrap.env.init_states = [0]
@@ -134,8 +142,6 @@ def main():
         json_open = open(args.mapping_path)
         aggr_set = [l for _, l in json.load(json_open).items()]
         logger.info(f"mappings: {aggr_set}")
-
-    logger.info(f"Start learning in the case of eta={args.eta}, rho={args.rho}")
 
     for learn_id, subgoal in enumerate(subgoals):
         logger.info(f"Subgoal {learn_id+1}/{len(subgoals)}: {subgoal}")
@@ -160,7 +166,7 @@ def main():
             agent = SRSSarsaAgent(args.discount, args.epsilon, args.lr_critic, env, args.temperature, rng, args.eta, args.rho, subgoal)
     
         learning_loop(env, agent, args.nruns, args.nepisodes, args.nsteps,
-                      args.id, args.env_id, learn_id)
+                      args.id, args.env_id, learn_id, args.nprocess)
     env.close()
 
 
@@ -169,12 +175,15 @@ if __name__ == '__main__':
     parser.add_argument('--video', action='store_true')
     parser.add_argument('--id', default='no_name', type=str)  # , choices=ALG_CHOICES
     parser.add_argument('--rho', default=0.05, type=float)
+    parser.add_argument('--nprocess', default=1, type=int)
     args = parser.parse_args()
-    env_dir = prep_dir(os.path.join("res", "env"))
-    val_dir = prep_dir(os.path.join("res", "values", args.id))
-    episode_dir = prep_dir(os.path.join("res", "episode", args.id))
-    policy_dir = prep_dir(os.path.join("res", "policy", args.id))
-    analysis_dir = prep_dir(os.path.join("res", "analysis", args.id))
-    steps_dir = prep_dir(os.path.join("res", "steps", args.id))
-    runtimes_dir = prep_dir(os.path.join("res", "runtime", args.id))
+    dirname = "{}-{}".format(datetime.now(), args.id)
+    env_dir = prep_dir(os.path.join("res", dirname, "env"))
+    val_dir = prep_dir(os.path.join("res", dirname, "values"))
+    episode_dir = prep_dir(os.path.join("res", dirname, "episode"))
+    policy_dir = prep_dir(os.path.join("res", dirname, "policy"))
+    analysis_dir = prep_dir(os.path.join("res", dirname, "analysis"))
+    steps_dir = prep_dir(os.path.join("res", dirname, "steps"))
+    runtimes_dir = prep_dir(os.path.join("res", dirname, "runtime"))
+    export_arguments(os.path.join("res", dirname, "config.json"), args)
     main()

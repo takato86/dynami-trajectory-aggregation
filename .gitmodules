@@ -1,0 +1,6 @@
+[submodule "gym-fourrooms"]
+    path = gym-fourrooms
+    url = https://github.com/takato86/gym-fourrooms.git
+[submodule "gym-pinball"]
+    path = gym-pinball
+    url = https://github.com/takato86/gym-pinball.git
