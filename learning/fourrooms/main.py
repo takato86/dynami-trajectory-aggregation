@@ -15,8 +15,11 @@ from src.agents.factory import create_agent
 from src.config import config
 from concurrent.futures import ProcessPoolExecutor
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+gym_fourrooms
+
 
 def export_steps(file_path, steps):
     with open(file_path, 'w') as f:

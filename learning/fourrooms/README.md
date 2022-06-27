@@ -1,4 +1,10 @@
 # How to run
+```bash
+python main.py --config=in/configs/fourooms.ini
+```
+
+
+# [OLD] How to run
 ## Baseline RL
 ```bash
 python main.py --discount=0.99 --epsilon=0.05 --lr_critic=0.25 --nruns=100 --nsteps=10000 --nepisodes=500 --env_id="ConstFourrooms-v0" --id="sarsa"
