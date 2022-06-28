@@ -1,5 +1,6 @@
 import logging
-import shaner
+import shaper
+from shaper.aggregator.subgoal_based import DynamicTrajectoryAggregation
 from src.agents.shaped import ShapedAgent
 from src.achievers import RoomsAchiever
 
@@ -14,14 +15,14 @@ class SRSAgent(ShapedAgent):
 
     def _generate_shaping(self, env, subgoals):
         nfeatures = env.observation_space.n
-        return shaner.SubgoalRS(
-            float(self.config["AGENT"]["discount"]),
-            float(self.config["AGENT"]["lr"]),
-            float(self.config["SHAPING"]["eta"]),
-            float(self.config["SHAPING"]["rho"]),
-            self.config["SHAPING"]["aggr_id"],
+        aggregator = DynamicTrajectoryAggregation(
             RoomsAchiever(
                 float(self.config["SHAPING"]["_range"]),
                 nfeatures, subgoals
             )
+        )
+        return shaper.SubgoalRS(
+            float(self.config["AGENT"]["discount"]),
+            float(self.config["SHAPING"]["eta"]),
+            aggregator
         )

@@ -1,5 +1,5 @@
 from src.agents.sarsa import SarsaAgent
-from src.agents.dta import DTAAgent, OffsetDTAAgent
+from src.agents.dta import DTAAgent
 from src.agents.srs import SRSAgent
 from src.agents.naive import NaiveRSAgent
 from src.agents.sprs import SPRSAgent
@@ -11,7 +11,6 @@ agent_dicts = {
 
 shaped_agent_dicts = {
     "DTAAgent": DTAAgent,
-    "OffsetDTAAgent": OffsetDTAAgent,
     "SRSAgent": SRSAgent,
     "NaiveRSAgent": NaiveRSAgent,
     "SPRSAgent": SPRSAgent
