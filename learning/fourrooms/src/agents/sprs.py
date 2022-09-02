@@ -1,5 +1,6 @@
 import logging
-import shaner
+import shaper
+from src.agents.dta import is_success
 from src.agents.shaped import ShapedAgent
 from src.achievers import RoomsAchiever
 
@@ -14,12 +15,13 @@ class SPRSAgent(ShapedAgent):
 
     def _generate_shaping(self, env, subgoals):
         nfeatures = env.observation_space.n
-        return shaner.SubgoalPulseRS(
+        return shaper.SubgoalPulseRS(
             float(self.config["AGENT"]["discount"]),
             RoomsAchiever(
                 float(self.config["SHAPING"]["_range"]),
                 nfeatures, subgoals
-            )
+            ),
+            is_success
         )
 
     def update(self, state, action, next_state, reward, done, info):

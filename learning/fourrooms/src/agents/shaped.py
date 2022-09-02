@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+from shaper.shaping.interface import AbstractShaping
 
 
 logger = logging.getLogger(__name__)
@@ -9,7 +10,7 @@ class ShapedAgent:
     def __init__(self, raw_agent, env, subgoals, config):
         self.raw_agent = raw_agent
         self.config = config
-        self.reward_shaping = self._generate_shaping(env, subgoals)
+        self.reward_shaping: AbstractShaping = self._generate_shaping(env, subgoals)
         self.current_shaping = 0
         self.env = env
         self.subgoals = subgoals

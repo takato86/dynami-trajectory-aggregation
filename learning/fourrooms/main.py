@@ -55,14 +55,14 @@ def load_subgoals(file_path, task_id=None):
 
 
 def learning_loop(env, subgoal, nruns, nepisodes, nsteps,
-                  id, env_id, nprocess):
+                  id, env_id, nprocess, out_dir):
     runtimes = []
     args = []
     for run in range(nruns):
         rng = np.random.RandomState((id + 1) * (run + 1))
         agent = create_agent(config, env, rng, subgoal)
         args.append(
-            [run, env, agent, nepisodes, nsteps, id, env_id]
+            [run, env, agent, nepisodes, nsteps, id, env_id, out_dir]
         )
     with ProcessPoolExecutor(max_workers=nprocess) as executor:
         ret = tqdm(executor.map(run_loop, args), total=nruns)
@@ -75,6 +75,7 @@ def learning_loop(env, subgoal, nruns, nepisodes, nsteps,
     #         run_loop(arg)
     #     )
 
+    runtimes_dir = os.path.join(out_dir, "runtime")
     export_runtimes(
         os.path.join(
             runtimes_dir,
@@ -86,7 +87,9 @@ def learning_loop(env, subgoal, nruns, nepisodes, nsteps,
 
 def run_loop(args):
     """The multiprocessed method."""
-    run, env, agent, nepisodes, nsteps, id, env_id = args
+    run, env, agent, nepisodes, nsteps, id, env_id, out_dir = args
+    steps_dir = os.path.join(out_dir, "steps")
+    detail_dir = os.path.join(out_dir, "detail")
     start_time = time.time()
     agent.reset()
     steps = []
@@ -140,7 +143,7 @@ def run_loop(args):
     return runtimes
 
 
-def main():
+def main(out_dir):
     logger.info(
         "env: {}, alg: {}".format(
             config["ENV"]["env_id"], config["AGENT"]["name"]
@@ -191,7 +194,8 @@ def main():
             int(config["AGENT"]["nsteps"]),
             learn_id,
             config["ENV"]["env_id"],
-            int(config["ENV"]["nprocess"])
+            int(config["ENV"]["nprocess"]),
+            out_dir
         )
     env.close()
 
@@ -214,4 +218,4 @@ if __name__ == '__main__':
     steps_dir = prep_dir(os.path.join(out_dir, "steps"))
     runtimes_dir = prep_dir(os.path.join(out_dir, "runtime"))
     detail_dir = prep_dir(os.path.join(out_dir, "detail"))
-    main()
+    main(out_dir)
