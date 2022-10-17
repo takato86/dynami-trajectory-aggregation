@@ -1,19 +1,33 @@
-import shaner
+import shaper
+from shaper.aggregator.subgoal_based import DynamicTrajectoryAggregation
+from src.agents.dta import is_success
 from src.agents.shaped import ShapedAgent
 from src.achievers import PinballAchiever
 
 
 class NaiveRSAgent(ShapedAgent):
     def _create_reward_shaping(self, env):
-        return shaner.NaiveSRS(
-            self.config["agent"]["gamma"],
-            self.config["agent"]["lr_theta"],
-            self.config["shaping"]["eta"],
-            self.config["shaping"]["rho"],
-            self.config["shaping"]["aggr_id"],
-            PinballAchiever(
+        achiever = PinballAchiever(
                 self.config["shaping"]["range"],
-                env.observation_space.shape[0],
                 self.subgoals
             )
+        aggregator = DynamicTrajectoryAggregation(achiever, is_success)
+        return shaper.NaiveSRS(
+            self.config["agent"]["gamma"],
+            self.config["shaping"]["eta"],
+            aggregator
+        )
+
+
+class LinearNaiveRSAgent(ShapedAgent):
+    def _create_reward_shaping(self, env):
+        achiever = PinballAchiever(
+            self.config["shaping"]["range"],
+            self.subgoals
+        )
+        aggregator = DynamicTrajectoryAggregation(achiever, is_success)
+        return shaper.LinearNaiveSRS(
+            self.config["agent"]["gamma"],
+            self.config["shaping"]["eta"],
+            aggregator
         )

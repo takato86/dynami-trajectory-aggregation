@@ -15,6 +15,7 @@ from src.agents.factory import create_agent
 from visualizer import Visualizer
 from concurrent.futures import ProcessPoolExecutor
 
+gym_pinball
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

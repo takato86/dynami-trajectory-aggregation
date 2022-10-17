@@ -1,7 +1,7 @@
 from src.agents.actor_critic import ActorCriticAgent
 from src.agents.srs import SRSAgent
 from src.agents.dta import DTAAgent
-from src.agents.naive import NaiveRSAgent
+from src.agents.naive import LinearNaiveRSAgent, NaiveRSAgent
 from src.agents.sprs import SPRSAgent
 
 
@@ -13,6 +13,7 @@ shaped_agent_dicts = {
     "SRSAgent": SRSAgent,
     "DTAAgent": DTAAgent,
     "NaiveRSAgent": NaiveRSAgent,
+    "LinearNaiveRSAgent": LinearNaiveRSAgent,
     "SPRSAgent": SPRSAgent
 }
 

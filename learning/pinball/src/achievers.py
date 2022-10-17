@@ -1,4 +1,4 @@
-from shaner.aggregater import AbstractAchiever
+from shaper.achiever import AbstractAchiever
 import numpy as np
 import logging
 
@@ -6,15 +6,19 @@ logger = logging.getLogger(__name__)
 
 
 class PinballAchiever(AbstractAchiever):
-    def __init__(self, _range, n_obs, subgoals):
-        super().__init__(_range, n_obs)
-        self.subgoals = subgoals  # 2d-ndarray shape(#obs, #subgoals)
+    def __init__(self, _range, subgoals):
+        self._range = _range
+        self.__subgoals = subgoals  # 2d-ndarray shape(#obs, #subgoals)
 
-    def eval(self, obs, current_state):
-        if len(self.subgoals) <= current_state:
+    @property
+    def subgoals(self):
+        return self.__subgoals
+
+    def eval(self, obs, subgoal_idx):
+        if len(self.subgoals) <= subgoal_idx:
             return False
 
-        subgoal = np.array(self.subgoals[current_state])
+        subgoal = np.array(self.subgoals[subgoal_idx])
         idxs = np.argwhere(subgoal == subgoal)  # np.nanでない要素を取り出し
         b_in = l2_norm_dist(
             subgoal[idxs].reshape(-1),
@@ -23,7 +27,7 @@ class PinballAchiever(AbstractAchiever):
         res = np.all(b_in)
 
         if res:
-            logger.debug("Achieve the subgoal{}".format(current_state))
+            logger.debug("Achieve the subgoal{}".format(subgoal_idx))
         return res
 
 

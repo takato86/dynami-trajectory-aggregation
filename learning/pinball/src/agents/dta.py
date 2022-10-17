@@ -1,22 +1,21 @@
-import shaner
+import shaper
+from shaper.aggregator.subgoal_based import DynamicTrajectoryAggregation
 from src.achievers import PinballAchiever
 from src.agents.shaped import ShapedAgent
 
 
 class DTAAgent(ShapedAgent):
     def _create_reward_shaping(self, env):
-        return shaner.SarsaRS(
+        achiever = PinballAchiever(
+            self.config["shaping"]["range"],
+            self.subgoals
+        )
+        aggregator = DynamicTrajectoryAggregation(achiever, is_success)
+        vfunc = aggregator.create_vfunc()
+        return shaper.SarsaRS(
             self.config["agent"]["gamma"],
             self.config["agent"]["lr_theta"],
-            env,
-            self.config["shaping"]["aggr_id"],
-            PinballAchiever(
-                self.config["shaping"]["range"],
-                env.observation_space.shape[0],
-                self.subgoals
-            ),
-            self.config["shaping"]["vid"],
-            is_success
+            aggregator, vfunc, is_success
         )
 
 

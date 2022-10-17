@@ -13,7 +13,7 @@ from .reward_shaping import SubgoalPotentialRewardShaping,\
                             SubgoalSarsaRewardShaping,\
                             NaiveRewardShaping, \
                             SarsaRewardShaping
-from shaner import SarsaRS, SubgoalRS
+from shaper import SarsaRS, SubgoalRS
 
 logger = logging.getLogger(__name__)
 

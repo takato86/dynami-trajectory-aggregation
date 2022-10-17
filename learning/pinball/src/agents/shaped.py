@@ -14,7 +14,7 @@ class ShapedAgent:
         return self.raw_agent.act(observation)
 
     def update(self, pre_obs, pre_a, r, obs, a, done, info):
-        f = self.reward_shaping.perform(pre_obs, obs, r, done, info)
+        f = self.reward_shaping.step(pre_obs, pre_a, r, obs, done, info)
         if done:
             self.reward_shaping.reset()
         self.raw_agent.update(pre_obs, pre_a, r+f, obs, a, done, info)
