@@ -5,8 +5,8 @@
         "out_dir": "out/nrs_human",
         "nepisodes": 250,
         "nruns": 100,
-        "parallel": false,
-        "nprocesses": 10
+        "parallel": true,
+        "nprocesses": 30
     },
     "env": {
         "id": "Pinball-Subgoal-v0",
