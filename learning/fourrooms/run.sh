@@ -1,17 +1,5 @@
-EPSILON=0.05
-NRUNS=1000  # 100 * 10
-NEPISODES=1000 # 1000 for eval.
-RHO=0
-RLENV="ConstFourrooms-v0"
-for ETA in 0.01
+for JSON in "linaive_human_1.ini" "linaive_human_2.ini" "linaive_human_3.ini" "linaive_human_4.ini" "linaive_human_5.ini" "naive_human_1.ini" "naive_human_2.ini"
 do
-ALG="random-srs-eta=${ETA}"
-echo "${ALG} on ${RLENV}"
-python main.py --discount=0.99 --epsilon=$EPSILON --lr_critic=0.25 \
-               --nruns=$NRUNS --nsteps=10000 --nepisodes=$NEPISODES \
-               --env_id=$RLENV \
-               --subgoal-path="in/subgoals/fourrooms_random_subgoals.csv" \
-               --id=$ALG \
-               --eta=$ETA \
-               --rho=$RHO
+echo "in/configs/${JSON}"
+xvfb-run -a python main.py --config="in/configs/${JSON}"
 done
