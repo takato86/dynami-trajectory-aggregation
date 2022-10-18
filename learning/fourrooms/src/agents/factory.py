@@ -2,6 +2,7 @@ from src.agents.sarsa import SarsaAgent
 from src.agents.dta import DTAAgent
 from src.agents.srs import SRSAgent
 from src.agents.naive import NaiveRSAgent
+from src.agents.naive import LinearNaiveRSAgent
 from src.agents.sprs import SPRSAgent
 
 
@@ -13,6 +14,7 @@ shaped_agent_dicts = {
     "DTAAgent": DTAAgent,
     "SRSAgent": SRSAgent,
     "NaiveRSAgent": NaiveRSAgent,
+    "LinearNaiveRSAgent": LinearNaiveRSAgent,
     "SPRSAgent": SPRSAgent
 }
 

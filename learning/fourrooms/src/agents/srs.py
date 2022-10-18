@@ -3,6 +3,7 @@ import shaper
 from shaper.aggregator.subgoal_based import DynamicTrajectoryAggregation
 from src.agents.shaped import ShapedAgent
 from src.achievers import RoomsAchiever
+from src.agents.dta import is_success
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,8 @@ class SRSAgent(ShapedAgent):
             RoomsAchiever(
                 float(self.config["SHAPING"]["_range"]),
                 nfeatures, subgoals
-            )
+            ),
+            is_success
         )
         return shaper.SubgoalRS(
             float(self.config["AGENT"]["discount"]),

@@ -21,7 +21,7 @@ class DTAAgent(ShapedAgent):
         vfunc = aggregator.create_vfunc()
         return shaper.SarsaRS(
             float(self.config["AGENT"]["discount"]),
-            float(self.config["AGENT"]["lr"]),
+            float(self.config["SHAPING"]["lr"]),
             aggregator, vfunc,
             is_success
         )
