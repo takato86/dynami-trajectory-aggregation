@@ -2,11 +2,11 @@
     "setting": {
         "visual": false,
         "seed": 0,
-        "out_dir": "out/dynamic_human",
+        "out_dir": "out/dynamic_human_v2",
         "nepisodes": 250,
         "nruns": 100,
         "parallel": true,
-        "nprocesses": 30
+        "nprocesses": 22
     },
     "env": {
         "id": "Pinball-Subgoal-v0",

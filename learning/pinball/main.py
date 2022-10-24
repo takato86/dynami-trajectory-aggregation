@@ -105,6 +105,7 @@ def learning_loop(args):
     run, config, subgoals, l_id = args
     logger.debug(f"start run {run}")
     subg_confs = list(itertools.chain.from_iterable(subgoals))
+    config["setting"]["seed"] = run
     env = gym.make(config["env"]["id"], subg_confs=subg_confs)
     env = wrappers.Monitor(env, directory=d_kinds["mv"], force=True)
     env.seed(config["setting"]["seed"])
