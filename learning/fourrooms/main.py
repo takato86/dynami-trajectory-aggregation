@@ -61,6 +61,7 @@ def learning_loop(env, subgoal, nruns, nepisodes, nsteps,
     for run in range(nruns):
         rng = np.random.RandomState((id + 1) * (run + 1))
         agent = create_agent(config, env, rng, subgoal)
+        env.seed(run)
         args.append(
             [run, env, agent, nepisodes, nsteps, id, env_id, out_dir]
         )

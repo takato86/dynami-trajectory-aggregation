@@ -18,6 +18,9 @@ class ShapedAgent:
     def _generate_shaping(self, env, subgoals):
         raise NotImplementedError
 
+    def seed(self, seed):
+        self.raw_agent.seed(seed)
+
     def update(self, state, action, next_state, reward, done, info):
         F = self.reward_shaping.step(
             state, action, reward, next_state, done, info

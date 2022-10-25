@@ -21,9 +21,15 @@ class SarsaAgent:
         self.critic = Sarsa(self.discount, self.lr, self.policy.weights)
         self.features = Tabular(nfeatures)
         self.total_shaped_reward = 0
+
         for state, value in q_value.items():
             phi = self.features(state)
             self.critic.initialize(phi, value)
+        
+        self.rng = np.random.RandomState(np.random.randint(0, 100))
+
+    def seed(self, seed):
+        self.rng = np.random.RandomState(seed)
 
     def act(self, state):
         return self.policy.sample(self.features(state))
@@ -37,8 +43,7 @@ class SarsaAgent:
         )
 
     def reset(self):
-        rng = np.random.RandomState(np.random.randint(0, 100))
-        self.policy = SoftmaxPolicy(rng, self.nfeatures, self.nactions,
+        self.policy = SoftmaxPolicy(self.rng, self.nfeatures, self.nactions,
                                     self.temperature)
         self.critic = Sarsa(self.discount, self.lr, self.policy.weights)
         self.features = Tabular(self.nfeatures)
