@@ -14,7 +14,7 @@ class DTAAgent(ShapedAgent):
         vfunc = aggregator.create_vfunc()
         return shaper.SarsaRS(
             self.config["agent"]["gamma"],
-            self.config["agent"]["lr_theta"],
+            self.config["shaping"]["lr"],
             aggregator, vfunc, is_success
         )
 
