@@ -1,6 +1,6 @@
 from src.agents.sarsa import SarsaAgent
-from src.agents.dta import DTAAgent
-from src.agents.srs import SRSAgent
+from src.agents.dta import DTAAgent, PartiallyDTAAgent
+from src.agents.srs import SRSAgent, PartiallySRSAgent
 from src.agents.naive import NaiveRSAgent
 from src.agents.naive import LinearNaiveRSAgent
 from src.agents.sprs import SPRSAgent
@@ -15,8 +15,10 @@ shaped_agent_dicts = {
     "SRSAgent": SRSAgent,
     "NaiveRSAgent": NaiveRSAgent,
     "LinearNaiveRSAgent": LinearNaiveRSAgent,
-    "SPRSAgent": SPRSAgent
-}
+    "SPRSAgent": SPRSAgent,
+    "PartiallyDTAAgent": PartiallyDTAAgent,
+    "PartiallySRSAgent": PartiallySRSAgent
+    }
 
 
 def create_agent(config, env, rng, subgoals, q_value={}):
