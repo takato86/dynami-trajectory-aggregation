@@ -14,6 +14,7 @@ from tqdm import tqdm
 from src.agents.factory import create_agent
 from src.config import config
 from concurrent.futures import ProcessPoolExecutor
+from pyvirtualdisplay import Display
 
 
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +55,19 @@ def load_subgoals(file_path, task_id=None):
     return subg_serieses
 
 
+def load_partially_subgoals(file_path):
+    logger.info(f"Loading partially subgoals: {file_path}")
+    subgoal_df = pd.read_csv(file_path)
+    subgs = subgoal_df.groupby("user_id").agg(list).values.tolist()
+    all_subg_tuples = []
+
+    for prev_subgs, next_subgs in subgs:
+        subg_tuples = [(prev_sg, next_sg) for prev_sg, next_sg in zip(prev_subgs, next_subgs)]
+        all_subg_tuples.append(subg_tuples)
+    
+    return all_subg_tuples
+
+
 def learning_loop(env, subgoal, nruns, nepisodes, nsteps,
                   id, env_id, nprocess, out_dir):
     runtimes = []
@@ -61,6 +75,7 @@ def learning_loop(env, subgoal, nruns, nepisodes, nsteps,
     for run in range(nruns):
         rng = np.random.RandomState((id + 1) * (run + 1))
         agent = create_agent(config, env, rng, subgoal)
+        env.seed(run)
         args.append(
             [run, env, agent, nepisodes, nsteps, id, env_id, out_dir]
         )
@@ -168,7 +183,12 @@ def main(out_dir):
     if "SHAPING" not in config.sections():
         pass
     elif config.get("SHAPING", "subgoal_path") is not None:
-        subgoals = load_subgoals(config["SHAPING"]["subgoal_path"], task_id=1)
+
+        if config["AGENT"]["name"] in ["PartiallyDTAAgent", "PartiallySRSAgent"]:
+            subgoals = load_partially_subgoals(config["SHAPING"]["subgoal_path"])
+        else:
+            subgoals = load_subgoals(config["SHAPING"]["subgoal_path"], task_id=1)
+
         logger.info(f"subgoals: {subgoals}")
     elif config.get("SHAPING", "mapping_path") is not None:
         json_open = open(config["SHAPING"]["mapping_path"])
@@ -218,4 +238,6 @@ if __name__ == '__main__':
     steps_dir = prep_dir(os.path.join(out_dir, "steps"))
     runtimes_dir = prep_dir(os.path.join(out_dir, "runtime"))
     detail_dir = prep_dir(os.path.join(out_dir, "detail"))
-    main(out_dir)
+
+    with Display():
+        main(out_dir)

@@ -14,6 +14,7 @@ from tqdm import tqdm
 from src.agents.factory import create_agent
 from visualizer import Visualizer
 from concurrent.futures import ProcessPoolExecutor
+from pyvirtualdisplay import Display
 
 gym_pinball
 logging.basicConfig(level=logging.INFO)
@@ -107,8 +108,8 @@ def learning_loop(args):
     subg_confs = list(itertools.chain.from_iterable(subgoals))
     config["setting"]["seed"] = run
     env = gym.make(config["env"]["id"], subg_confs=subg_confs)
-    env = wrappers.Monitor(env, directory=d_kinds["mv"], force=True)
     env.seed(config["setting"]["seed"])
+    env = wrappers.Monitor(env, directory=d_kinds["mv"], force=True)
     agent = create_agent(config, env, subgoals)
     fnames = get_file_names(config["agent"]["name"], l_id, run)
 
@@ -263,4 +264,7 @@ if __name__ == '__main__':
             os.makedirs(fpath)
 
     shutil.copy(args.config, os.path.join(saved_dir, config_fname))
-    main()
+
+    with Display() as disp:
+        main()
+    
