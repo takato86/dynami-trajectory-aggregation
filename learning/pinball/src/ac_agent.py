@@ -38,7 +38,6 @@ class Actor(object):
         """
         Returns: ndarray(#actions)
         """
-        # TODO check
         energy = self.value(feat) # / self.temperature # >> (1, #actions)
         return np.exp(energy - logsumexp(energy))
 

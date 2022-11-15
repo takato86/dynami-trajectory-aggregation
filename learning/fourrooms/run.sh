@@ -1,5 +1,6 @@
-for JSON in "linaive_human_1.ini" "linaive_human_2.ini" "linaive_human_3.ini" "linaive_human_4.ini" "linaive_human_5.ini" "naive_human_1.ini" "naive_human_2.ini"
+for INI in "dynamic_human_0.1.ini" "dynamic_human_0.01.ini" "dynamic_human_0.001.ini"
 do
-echo "in/configs/${JSON}"
-xvfb-run -a python main.py --config="in/configs/${JSON}"
+INI_PATH="in/configs/step_env/${INI}"
+echo $INI_PATH
+python main.py --config=$INI_PATH
 done

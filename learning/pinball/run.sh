@@ -1,4 +1,4 @@
-for JSON in "dta.json" "linrs.json" "nrs.json" "srs.json"
+for JSON in "linrs.json" "nrs.json"
 do
 echo "in/configs/${JSON}"
 xvfb-run -a python main.py --config="in/configs/${JSON}"
