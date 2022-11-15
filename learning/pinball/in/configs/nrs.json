@@ -6,7 +6,7 @@
         "nepisodes": 250,
         "nruns": 100,
         "parallel": true,
-        "nprocesses": 22
+        "nprocesses": 32
     },
     "env": {
         "id": "Pinball-Subgoal-v0",

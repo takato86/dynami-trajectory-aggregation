@@ -2,9 +2,9 @@
     "setting": {
         "visual": false,
         "seed": 0,
-        "out_dir": "out/static_random_v3",
+        "out_dir": "out/hypara/dynamic_human_005",
         "nepisodes": 250,
-        "nruns": 100,
+        "nruns": 10,
         "parallel": true,
         "nprocesses": 32
     },
@@ -13,7 +13,7 @@
         "model": null
     },
     "agent": {
-        "name": "SRSAgent",
+        "name": "DTAAgent",
         "raw_agent": "ActorCriticAgent",
         "basis_order": 3,
         "epsilon": 0.01,
@@ -23,7 +23,7 @@
     },
     "shaping":{
         "range": 0.04,
-        "eta": 1000,
-        "subg_path": "in/subgoals/random_subgoals.csv"
+        "lr": 0.05,
+        "subg_path": "in/subgoals/human_subgoals_mini.csv"
     }
 }
